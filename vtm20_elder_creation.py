@@ -1,5 +1,6 @@
-# vtm20_elder_creation.py
+#!/user/bin/env python3
 
+# --- IMPORTS ---
 import sys
 import math
 
@@ -188,7 +189,7 @@ class VtMCharacter:
         self.spent_freebies += total_cost
         print(f"\n>> Success! '{trait_name}' raised to {target_value}. You spent {total_cost} freebie points.")
 
-# --- INITIAL CHARACTER SETUP
+# --- INITIAL CHARACTER SETUP ---
 def setup_character():
     """Guides the user through the initial character setup."""
     print("--- Vampire Character Progression Helper ---")
