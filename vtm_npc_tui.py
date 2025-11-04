@@ -187,47 +187,85 @@ class TUIApp:
 
     def setup_character(self) -> bool:
         """Initial character setup screen."""
-        while True:
+        h, w = self.stdscr.getmaxyx()
+        
+        # Calculate centered container
+        container_width = 70
+        container_height = 18
+        start_x = (w - container_width) // 2
+        start_y = (h - container_height) // 2
+        
+        entered_info = {}
+        prompts = [
+            ("Character Name", "name", None, None),
+            ("Clan", "clan", None, None),
+            ("Age (0-5600+)", "age", 0, 10000),
+            ("Generation (2-16)", "generation", 2, 16)
+        ]
+        
+        for i, (label, key, min_val, max_val) in enumerate(prompts):
             self.stdscr.clear()
-            h, w = self.stdscr.getmaxyx()
             
             # Title
             title = "VAMPIRE: THE MASQUERADE - ELDER CHARACTER CREATOR"
-            self.stdscr.addstr(1, (w - len(title)) // 2, title, curses.color_pair(5) | curses.A_BOLD)
+            self.stdscr.addstr(start_y - 3, (w - len(title)) // 2, title, 
+                             curses.color_pair(5) | curses.A_BOLD)
             
-            self.draw_box(3, 2, 15, w - 4, "Character Setup")
+            self.draw_box(start_y, start_x, container_height, container_width, "Character Setup")
             
-            # Get character info
-            name = self.get_string_input("Character Name: ", 5, 5)
-            if not name:
-                return False
+            # Display entered info
+            list_y = start_y + 2
+            for info_label, info_value in entered_info.items():
+                self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", 
+                                 curses.color_pair(1))
+                list_y += 1
             
-            clan = self.get_string_input("Clan: ", 7, 5)
-            if not clan:
-                return False
+            # Get current input
+            if min_val is not None:  # Number input
+                value = self.get_number_input(f"{label}: ", list_y, start_x + 2, min_val, max_val)
+                if value is None:
+                    return False
+            else:  # String input
+                value = self.get_string_input(f"{label}: ", list_y, start_x + 2)
+                if not value:
+                    return False
             
-            age = self.get_number_input("Age (0-5600+): ", 9, 5, 0, 10000)
-            if age is None:
-                return False
-            
-            generation = self.get_number_input("Generation (2-16): ", 11, 5, 2, 16)
-            if generation is None:
-                return False
-            
-            self.character = VtMCharacter(name, clan, age, generation)
-            
-            self.stdscr.clear()
-            self.stdscr.addstr(5, 5, f"Character created with {self.character.total_freebies} Freebie Points!", 
-                             curses.color_pair(1) | curses.A_BOLD)
-            self.stdscr.addstr(7, 5, "Press any key to set initial traits...")
-            self.stdscr.refresh()
-            self.stdscr.getch()
-            
-            # Set initial traits
-            if not self.setup_initial_traits():
-                return False
-            
-            return True
+            entered_info[label] = value
+        
+        # Create character
+        self.character = VtMCharacter(
+            entered_info["Character Name"],
+            entered_info["Clan"],
+            entered_info["Age (0-5600+)"],
+            entered_info["Generation (2-16)"]
+        )
+        
+        # Show confirmation
+        self.stdscr.clear()
+        self.draw_box(start_y, start_x, container_height, container_width, "Character Created")
+        
+        list_y = start_y + 2
+        for info_label, info_value in entered_info.items():
+            self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", 
+                             curses.color_pair(1))
+            list_y += 1
+        
+        list_y += 1
+        freebie_msg = f"Character created with {self.character.total_freebies} Freebie Points!"
+        self.stdscr.addstr(list_y, start_x + 2, freebie_msg, 
+                         curses.color_pair(1) | curses.A_BOLD)
+        
+        list_y += 2
+        self.stdscr.addstr(list_y, start_x + 2, "Press any key to set initial traits...", 
+                         curses.color_pair(3))
+        self.stdscr.refresh()
+        self.stdscr.getch()
+        
+        # Set initial traits
+        if not self.setup_initial_traits():
+            return False
+        
+        return True
 
     def setup_initial_traits(self) -> bool:
         """Setup initial trait values with list display."""
