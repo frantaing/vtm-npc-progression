@@ -1,124 +1,27 @@
 #!/usr/bin/env python3
 
-# --- IMPORTS ---
+"""
+vtm_tui.py
+
+This module contains the UI for the tool. It handles all rendering and
+user input, and uses on vtm_npc_logic.py for character management.
+"""
+
+# --- [IMPORTS] ---
 import curses
 import sys
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Optional
+from vtm_npc_logic import ( # Import from vtm_npc_logic.py
+    VtMCharacter,
+    ATTRIBUTES_LIST,
+    ABILITIES_LIST,
+    VIRTUES_LIST
+)
 
-# --- DATA ---
-GENERATION_DATA = {
-    2: {"max_trait": 10}, 3: {"max_trait": 10}, 4: {"max_trait": 9},
-    5: {"max_trait": 8}, 6: {"max_trait": 7}, 7: {"max_trait": 6},
-    8: {"max_trait": 5}, 9: {"max_trait": 5}, 10: {"max_trait": 5},
-    11: {"max_trait": 5}, 12: {"max_trait": 5}, 13: {"max_trait": 5},
-    14: {"max_trait": 5}, 15: {"max_trait": 5}, 16: {"max_trait": 5}
-}
-
-AGE_FREEBIE_BRACKETS = [
-    (50, 45), (100, 90), (200, 150), (350, 225), (550, 315),
-    (800, 390), (1100, 465), (1450, 525), (1850, 585), (2300, 630),
-    (2800, 675), (3350, 705), (3950, 735), (5600, 750)
-]
-
-FREEBIE_COSTS = {
-    "Attribute": 5, "Ability": 2, "Discipline": 7,
-    "Background": 1, "Virtue": 2, "Humanity": 1, "Willpower": 1
-}
-
-ATTRIBUTES_LIST = [
-    "Strength", "Dexterity", "Stamina",                 # Physical
-    "Charisma", "Manipulation", "Appearance",           # Social
-    "Perception", "Intelligence", "Wits"                # Mental
-]
-
-ABILITIES_LIST = [
-    # Talents
-    "Alertness", "Athletics", "Awareness", "Brawl", "Empathy",
-    "Expression", "Intimidation", "Leadership", "Streetwise", "Subterfuge",
-    # Skills
-    "Animal Ken", "Crafts", "Drive", "Etiquette", "Firearms",
-    "Larceny", "Melee", "Performance", "Stealth", "Survival",
-    # Knowledges
-    "Academics", "Computer", "Finance", "Investigation", "Law",
-    "Medicine", "Occult", "Politics", "Science", "Technology"
-]
-
-VIRTUES_LIST = ["Conscience", "Self-Control", "Courage"]
-
-# --- CHARACTER CLASS ---
-class VtMCharacter:
-    """Stores and manages a VtM character's progression."""
-
-    def __init__(self, name, clan, age, generation):
-        self.name = name
-        self.clan = clan
-        self.age = age
-        self.generation = generation
-
-        self.attributes = {}
-        self.abilities = {}
-        self.disciplines = {}
-        self.backgrounds = {}
-        self.virtues = {}
-        self.humanity = {"base": 0, "new": 0}
-        self.willpower = {"base": 0, "new": 0}
-
-        self.max_trait_rating = GENERATION_DATA.get(generation, {}).get("max_trait", 5)
-        self.total_freebies = self._calculate_total_freebies()
-        self.spent_freebies = 0
-
-    def _calculate_total_freebies(self):
-        for upper_age, points in AGE_FREEBIE_BRACKETS:
-            if self.age <= upper_age:
-                return points
-        return AGE_FREEBIE_BRACKETS[-1][1]
-
-    def set_initial_trait(self, category, trait_name, value):
-        trait_dict = getattr(self, category)
-        trait_dict[trait_name] = {"base": value, "new": value}
-
-    def set_initial_value(self, category, value):
-        stat = getattr(self, category)
-        stat["base"] = value
-        stat["new"] = value
-
-    def get_trait_data(self, category_name, trait_name):
-        if category_name in ["Attribute", "Ability", "Discipline", "Background", "Virtue"]:
-            attr_name = "abilities" if category_name == "Ability" else f"{category_name.lower()}s"
-            trait_pool = getattr(self, attr_name)
-            return trait_pool.get(trait_name, {"base": 0, "new": 0})
-        else:
-            return getattr(self, category_name.lower())
-
-    def improve_trait(self, category_name, trait_name, target_value):
-        cost_per_dot = FREEBIE_COSTS[category_name]
-        remaining_points = self.total_freebies - self.spent_freebies
-
-        if category_name in ["Attribute", "Ability", "Discipline", "Background", "Virtue"]:
-            trait_pool = getattr(self, "abilities" if category_name == "Ability" else f"{category_name.lower()}s")
-            if trait_name not in trait_pool:
-                trait_pool[trait_name] = {"base": 0, "new": 0}
-            trait_data = trait_pool[trait_name]
-        else:
-            trait_data = getattr(self, category_name.lower())
-
-        current_rating = trait_data["new"]
-
-        if target_value <= current_rating:
-            return False, f"New value must be higher than current ({current_rating})"
-
-        dots_to_add = target_value - current_rating
-        total_cost = dots_to_add * cost_per_dot
-
-        if remaining_points < total_cost:
-            return False, f"Not enough points! Cost: {total_cost}, Available: {remaining_points}"
-
-        trait_data["new"] = target_value
-        self.spent_freebies += total_cost
-        return True, f"'{trait_name}' raised to {target_value}. Cost: {total_cost} points"
-
-# --- TUI ---
+# --- [TUI] ---
 class TUIApp:
+    """Manages the curses UI for character progression."""
+
     def __init__(self, stdscr):
         self.stdscr = stdscr
         self.character: Optional[VtMCharacter] = None
@@ -189,7 +92,6 @@ class TUIApp:
         """Initial character setup screen."""
         h, w = self.stdscr.getmaxyx()
         
-        # Calculate centered container
         container_width = 70
         container_height = 18
         start_x = (w - container_width) // 2
@@ -206,33 +108,25 @@ class TUIApp:
         for i, (label, key, min_val, max_val) in enumerate(prompts):
             self.stdscr.clear()
             
-            # Title
-            title = "VAMPIRE: THE MASQUERADE - ELDER CHARACTER CREATOR"
-            self.stdscr.addstr(start_y - 3, (w - len(title)) // 2, title, 
-                             curses.color_pair(5) | curses.A_BOLD)
+            title = "VAMPIRE: THE MASQUERADE - NPC PROGRESSION TOOL"
+            self.stdscr.addstr(start_y - 3, (w - len(title)) // 2, title, curses.color_pair(5) | curses.A_BOLD)
             
             self.draw_box(start_y, start_x, container_height, container_width, "Character Setup")
             
-            # Display entered info
             list_y = start_y + 2
             for info_label, info_value in entered_info.items():
-                self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", 
-                                 curses.color_pair(1))
+                self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", curses.color_pair(1))
                 list_y += 1
             
-            # Get current input
-            if min_val is not None:  # Number input
+            if min_val is not None:
                 value = self.get_number_input(f"{label}: ", list_y, start_x + 2, min_val, max_val)
-                if value is None:
-                    return False
-            else:  # String input
+                if value is None: return False
+            else:
                 value = self.get_string_input(f"{label}: ", list_y, start_x + 2)
-                if not value:
-                    return False
+                if not value: return False
             
             entered_info[label] = value
         
-        # Create character
         self.character = VtMCharacter(
             entered_info["Character Name"],
             entered_info["Clan"],
@@ -240,28 +134,23 @@ class TUIApp:
             entered_info["Generation (2-16)"]
         )
         
-        # Show confirmation
         self.stdscr.clear()
         self.draw_box(start_y, start_x, container_height, container_width, "Character Created")
         
         list_y = start_y + 2
         for info_label, info_value in entered_info.items():
-            self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", 
-                             curses.color_pair(1))
+            self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", curses.color_pair(1))
             list_y += 1
         
         list_y += 1
         freebie_msg = f"Character created with {self.character.total_freebies} Freebie Points!"
-        self.stdscr.addstr(list_y, start_x + 2, freebie_msg, 
-                         curses.color_pair(1) | curses.A_BOLD)
+        self.stdscr.addstr(list_y, start_x + 2, freebie_msg, curses.color_pair(1) | curses.A_BOLD)
         
         list_y += 2
-        self.stdscr.addstr(list_y, start_x + 2, "Press any key to set initial traits...", 
-                         curses.color_pair(3))
+        self.stdscr.addstr(list_y, start_x + 2, "Press any key to set initial traits...", curses.color_pair(3))
         self.stdscr.refresh()
         self.stdscr.getch()
         
-        # Set initial traits
         if not self.setup_initial_traits():
             return False
         
@@ -273,128 +162,78 @@ class TUIApp:
         
         # Attributes
         entered_attrs = {}
-        for i, attr in enumerate(ATTRIBUTES_LIST):
+        for attr in ATTRIBUTES_LIST:
             self.stdscr.clear()
-            
-            # Calculate centered container
-            container_width = 60
-            container_height = 20
-            start_x = (w - container_width) // 2
-            start_y = (h - container_height) // 2
+            container_width, container_height = 60, 20
+            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             
             self.draw_box(start_y, start_x, container_height, container_width, "Initial Attributes")
             self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial attribute values (1-10)", curses.color_pair(3))
             
-            # Display already entered attributes
             list_y = start_y + 4
             for name, value in entered_attrs.items():
                 self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1))
                 list_y += 1
             
-            # Prompt for current attribute
             val = self.get_number_input(f"{attr}: ", list_y, start_x + 2, 1, 10)
-            if val is None:
-                return False
+            if val is None: return False
             entered_attrs[attr] = val
             self.character.set_initial_trait("attributes", attr, val)
         
         # Abilities
         entered_abils = {}
-        for i, abil in enumerate(ABILITIES_LIST):
+        for abil in ABILITIES_LIST:
             self.stdscr.clear()
-            
-            container_width = 60
-            container_height = min(40, h - 4)
-            start_x = (w - container_width) // 2
-            start_y = (h - container_height) // 2
+            container_width, container_height = 60, min(40, h - 4)
+            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             
             self.draw_box(start_y, start_x, container_height, container_width, "Initial Abilities")
             self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial ability values (0-10)", curses.color_pair(3))
             
-            # Display already entered abilities (scrollable)
             list_y = start_y + 4
             max_display = container_height - 8
             start_idx = max(0, len(entered_abils) - max_display + 1)
             
             for name, value in list(entered_abils.items())[start_idx:]:
-                if list_y >= start_y + container_height - 4:
-                    break
+                if list_y >= start_y + container_height - 4: break
                 self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1))
                 list_y += 1
             
             val = self.get_number_input(f"{abil}: ", list_y, start_x + 2, 0, 10)
-            if val is None:
-                return False
+            if val is None: return False
             entered_abils[abil] = val
             self.character.set_initial_trait("abilities", abil, val)
         
-        # Disciplines
-        entered_discs = {}
-        while True:
-            self.stdscr.clear()
-            
-            container_width = 60
-            container_height = 25
-            start_x = (w - container_width) // 2
-            start_y = (h - container_height) // 2
-            
-            self.draw_box(start_y, start_x, container_height, container_width, "Initial Disciplines")
-            self.stdscr.addstr(start_y + 2, start_x + 2, 
-                             "Enter disciplines (empty name when done)", curses.color_pair(3))
-            
-            list_y = start_y + 4
-            for name, value in entered_discs.items():
-                self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1))
-                list_y += 1
-            
-            disc_name = self.get_string_input("Discipline Name: ", list_y, start_x + 2)
-            if not disc_name:
-                break
-            
-            val = self.get_number_input(f"  Value: ", list_y + 1, start_x + 2, 1, 10)
-            if val is None:
-                continue
-            entered_discs[disc_name] = val
-            self.character.set_initial_trait("disciplines", disc_name, val)
-        
-        # Backgrounds
-        entered_bgs = {}
-        while True:
-            self.stdscr.clear()
-            
-            container_width = 60
-            container_height = 25
-            start_x = (w - container_width) // 2
-            start_y = (h - container_height) // 2
-            
-            self.draw_box(start_y, start_x, container_height, container_width, "Initial Backgrounds")
-            self.stdscr.addstr(start_y + 2, start_x + 2, 
-                             "Enter backgrounds (empty name when done)", curses.color_pair(3))
-            
-            list_y = start_y + 4
-            for name, value in entered_bgs.items():
-                self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1))
-                list_y += 1
-            
-            bg_name = self.get_string_input("Background Name: ", list_y, start_x + 2)
-            if not bg_name:
-                break
-            
-            val = self.get_number_input(f"  Value: ", list_y + 1, start_x + 2, 1, 10)
-            if val is None:
-                continue
-            entered_bgs[bg_name] = val
-            self.character.set_initial_trait("backgrounds", bg_name, val)
+        # Disciplines & Backgrounds (Loops)
+        for trait_type in ["Disciplines", "Backgrounds"]:
+            entered_items = {}
+            while True:
+                self.stdscr.clear()
+                container_width, container_height = 60, 25
+                start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
+                
+                self.draw_box(start_y, start_x, container_height, container_width, f"Initial {trait_type}")
+                self.stdscr.addstr(start_y + 2, start_x + 2, f"Enter {trait_type.lower()} (empty name when done)", curses.color_pair(3))
+                
+                list_y = start_y + 4
+                for name, value in entered_items.items():
+                    self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1))
+                    list_y += 1
+                
+                item_name = self.get_string_input(f"{trait_type[:-1]} Name: ", list_y, start_x + 2)
+                if not item_name: break
+                
+                val = self.get_number_input("  Value: ", list_y + 1, start_x + 2, 1, 10)
+                if val is None: continue
+                entered_items[item_name] = val
+                self.character.set_initial_trait(trait_type.lower(), item_name, val)
         
         # Virtues
         entered_virtues = {}
         for virtue in VIRTUES_LIST:
             self.stdscr.clear()
-            
-            container_width = 60
-            container_height = 15
-            start_x = (w - container_width) // 2
-            start_y = (h - container_height) // 2
+            container_width, container_height = 60, 15
+            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             
             self.draw_box(start_y, start_x, container_height, container_width, "Virtues & Path")
             self.stdscr.addstr(start_y + 2, start_x + 2, "Set virtue values (1-10)", curses.color_pair(3))
@@ -405,18 +244,14 @@ class TUIApp:
                 list_y += 1
             
             val = self.get_number_input(f"{virtue}: ", list_y, start_x + 2, 1, 10)
-            if val is None:
-                return False
+            if val is None: return False
             entered_virtues[virtue] = val
             self.character.set_initial_trait("virtues", virtue, val)
         
         # Humanity and Willpower
         self.stdscr.clear()
-        
-        container_width = 60
-        container_height = 15
-        start_x = (w - container_width) // 2
-        start_y = (h - container_height) // 2
+        container_width, container_height = 60, 15
+        start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
         
         self.draw_box(start_y, start_x, container_height, container_width, "Final Values")
         
@@ -427,13 +262,11 @@ class TUIApp:
         
         list_y += 1
         humanity = self.get_number_input("Humanity/Path: ", list_y, start_x + 2, 1, 10)
-        if humanity is None:
-            return False
+        if humanity is None: return False
         self.character.set_initial_value("humanity", humanity)
         
         willpower = self.get_number_input("Willpower: ", list_y + 1, start_x + 2, 1, 10)
-        if willpower is None:
-            return False
+        if willpower is None: return False
         self.character.set_initial_value("willpower", willpower)
         
         return True
@@ -461,8 +294,7 @@ class TUIApp:
         self.stdscr.addstr(y, x, "═══ ATTRIBUTES ═══", curses.color_pair(4) | curses.A_BOLD)
         y += 1
         for name, data in self.character.attributes.items():
-            if y >= start_y + 40:  # Don't overflow
-                break
+            if y >= start_y + 40: break
             self.display_trait(y, x, name, data, width)
             y += 1
         y += 1
@@ -471,35 +303,23 @@ class TUIApp:
         self.stdscr.addstr(y, x, "═══ ABILITIES ═══", curses.color_pair(4) | curses.A_BOLD)
         y += 1
         abilities_shown = [(name, data) for name, data in self.character.abilities.items() if data['new'] > 0]
-        for name, data in abilities_shown[:8]:  # Limit display
-            if y >= start_y + 40:
-                break
+        for name, data in abilities_shown[:8]:
+            if y >= start_y + 40: break
             self.display_trait(y, x, name, data, width)
             y += 1
         y += 1
         
-        # Disciplines
-        if self.character.disciplines:
-            self.stdscr.addstr(y, x, "═══ DISCIPLINES ═══", curses.color_pair(4) | curses.A_BOLD)
-            y += 1
-            for name, data in self.character.disciplines.items():
-                if y >= start_y + 40:
-                    break
-                self.display_trait(y, x, name, data, width)
+        # Other categories
+        for category in ["disciplines", "backgrounds"]:
+            if getattr(self.character, category):
+                self.stdscr.addstr(y, x, f"═══ {category.upper()} ═══", curses.color_pair(4) | curses.A_BOLD)
                 y += 1
-            y += 1
-        
-        # Backgrounds
-        if self.character.backgrounds:
-            self.stdscr.addstr(y, x, "═══ BACKGROUNDS ═══", curses.color_pair(4) | curses.A_BOLD)
-            y += 1
-            for name, data in self.character.backgrounds.items():
-                if y >= start_y + 40:
-                    break
-                self.display_trait(y, x, name, data, width)
+                for name, data in getattr(self.character, category).items():
+                    if y >= start_y + 40: break
+                    self.display_trait(y, x, name, data, width)
+                    y += 1
                 y += 1
-            y += 1
-        
+
         # Virtues
         self.stdscr.addstr(y, x, "═══ VIRTUES & PATH ═══", curses.color_pair(4) | curses.A_BOLD)
         y += 1
@@ -509,8 +329,6 @@ class TUIApp:
         self.display_trait(y, x, "Humanity", self.character.humanity, width)
         y += 1
         self.display_trait(y, x, "Willpower", self.character.willpower, width)
-        
-        return y
 
     def display_trait(self, y: int, x: int, name: str, data: Dict, width: int = 30):
         """Display a single trait with progression."""
@@ -525,207 +343,158 @@ class TUIApp:
         """Main menu for spending freebie points with split view."""
         selected = 0
         menu_items = [
-            ("Attributes", "Attribute", 5),
-            ("Abilities", "Ability", 2),
-            ("Disciplines", "Discipline", 7),
-            ("Backgrounds", "Background", 1),
-            ("Virtues", "Virtue", 2),
-            ("Humanity/Path", "Humanity", 1),
-            ("Willpower", "Willpower", 1),
-            ("Exit", None, 0)
+            ("Attributes", "Attribute"), ("Abilities", "Ability"),
+            ("Disciplines", "Discipline"), ("Backgrounds", "Background"),
+            ("Virtues", "Virtue"), ("Humanity/Path", "Humanity"),
+            ("Willpower", "Willpower"),
         ]
         
         while True:
-            self.stdscr.clear()
             h, w = self.stdscr.getmaxyx()
-            
-            # Calculate centered container dimensions
+            self.stdscr.clear()
+
             container_width = min(100, w - 10)
             container_height = min(50, h - 6)
             start_x = (w - container_width) // 2
             start_y = (h - container_height) // 2
             
-            # Split container into left (character sheet) and right (menu)
             left_width = 35
             right_width = container_width - left_width - 3
             
-            # Draw main container
             self.draw_box(start_y, start_x, container_height, container_width, "VTM Elder Creator")
             
-            # Draw left panel (character sheet)
-            left_x = start_x + 2
-            self.display_character_sheet(start_y + 2, left_x, left_width)
+            self.display_character_sheet(start_y + 2, start_x + 2, left_width)
             
-            # Draw vertical separator
             for i in range(1, container_height - 1):
                 self.stdscr.addstr(start_y + i, start_x + left_width + 2, "│", curses.color_pair(4))
             
-            # Draw right panel (menu)
             right_x = start_x + left_width + 4
             menu_y = start_y + 2
             
             self.stdscr.addstr(menu_y, right_x, "SPEND FREEBIE POINTS", curses.color_pair(3) | curses.A_BOLD)
             menu_y += 2
             
-            for i, (label, _, cost) in enumerate(menu_items):
-                if menu_y >= start_y + container_height - 2:
-                    break
-                    
+            from vtm_logic import FREEBIE_COSTS
+            for i, (label, category) in enumerate(menu_items):
+                if menu_y >= start_y + container_height - 2: break
+                cost = FREEBIE_COSTS.get(category, "N/A")
                 prefix = "► " if i == selected else "  "
-                if cost > 0:
-                    menu_str = f"{prefix}{label} (Cost: {cost}/dot)"
-                else:
-                    menu_str = f"{prefix}{label}"
-                
+                menu_str = f"{prefix}{label} (Cost: {cost}/dot)"
                 attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
                 self.stdscr.addstr(menu_y + i, right_x, menu_str[:right_width], attr)
             
-            # Display message at bottom of container
             if self.message:
-                msg_y = start_y + container_height - 2
-                self.stdscr.addstr(msg_y, start_x + 2, self.message[:container_width-4], 
-                                 curses.color_pair(self.message_color))
+                self.stdscr.addstr(start_y + container_height - 2, start_x + 2, self.message[:container_width-4], curses.color_pair(self.message_color))
             
-            # Controls outside container
-            controls = "↑/↓: Navigate | Enter: Select | Q: Quit"
+            controls = "↑/↓: Navigate | Enter: Select | Ctrl+Q: Finalize & Exit"
             self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(3))
             
             self.stdscr.refresh()
             
-            # Handle input
             key = self.stdscr.getch()
             
-            if key == curses.KEY_UP:
-                selected = (selected - 1) % len(menu_items)
+            if key == curses.KEY_RESIZE:
+                self.message = ""
+                continue
+            elif key == curses.KEY_UP:
+                selected = (selected - 1 + len(menu_items)) % len(menu_items)
                 self.message = ""
             elif key == curses.KEY_DOWN:
                 selected = (selected + 1) % len(menu_items)
                 self.message = ""
             elif key == ord('\n'):
-                if selected == len(menu_items) - 1:  # Exit
-                    return
-                else:
-                    self.handle_improvement_menu(menu_items[selected][0], menu_items[selected][1])
-            elif key == ord('q') or key == ord('Q'):
+                self.handle_improvement_menu(menu_items[selected][0], menu_items[selected][1])
+            elif key == 17:  # Ctrl+Q
                 return
 
     def handle_improvement_menu(self, label: str, category: str):
         """Handle improvement of a specific category with split view."""
-        # Determine trait list
-        if category == "Attribute":
-            trait_list = ATTRIBUTES_LIST
-            trait_dict = self.character.attributes
-        elif category == "Ability":
-            trait_list = ABILITIES_LIST
-            trait_dict = self.character.abilities
-        elif category == "Discipline":
-            trait_list = list(self.character.disciplines.keys())
-            trait_dict = self.character.disciplines
-        elif category == "Background":
-            trait_list = list(self.character.backgrounds.keys())
-            trait_dict = self.character.backgrounds
-        elif category == "Virtue":
-            trait_list = VIRTUES_LIST
-            trait_dict = self.character.virtues
-        elif category == "Humanity":
-            self.improve_single_trait(category, "Humanity/Path")
-            return
-        elif category == "Willpower":
-            self.improve_single_trait(category, "Willpower")
-            return
-        else:
+        trait_list_map = {
+            "Attribute": ATTRIBUTES_LIST, "Ability": ABILITIES_LIST,
+            "Discipline": list(self.character.disciplines.keys()),
+            "Background": list(self.character.backgrounds.keys()),
+            "Virtue": VIRTUES_LIST,
+        }
+        if category in ["Humanity", "Willpower"]:
+            self.improve_single_trait(category, "Humanity/Path" if category == "Humanity" else "Willpower")
             return
         
-        selected = 0
+        trait_list = trait_list_map.get(category, [])
+        selected, scroll_offset = 0, 0
         can_add = category in ["Discipline", "Background"]
-        
+
         while True:
-            self.stdscr.clear()
             h, w = self.stdscr.getmaxyx()
-            
-            # Calculate centered container dimensions
+            self.stdscr.clear()
+
             container_width = min(100, w - 10)
             container_height = min(50, h - 6)
-            start_x = (w - container_width) // 2
-            start_y = (h - container_height) // 2
+            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             
-            # Split container
             left_width = 35
-            right_width = container_width - left_width - 3
             
-            # Draw main container
-            title = f"Improve {label}"
-            self.draw_box(start_y, start_x, container_height, container_width, title)
+            self.draw_box(start_y, start_x, container_height, container_width, f"Improve {label}")
+            self.display_character_sheet(start_y + 2, start_x + 2, left_width)
             
-            # Draw left panel (character sheet)
-            left_x = start_x + 2
-            self.display_character_sheet(start_y + 2, left_x, left_width)
-            
-            # Draw vertical separator
             for i in range(1, container_height - 1):
                 self.stdscr.addstr(start_y + i, start_x + left_width + 2, "│", curses.color_pair(4))
-            
-            # Draw right panel (trait selection)
+
             right_x = start_x + left_width + 4
             menu_y = start_y + 2
             
-            # Show available points
             remaining = self.character.total_freebies - self.character.spent_freebies
-            points_str = f"Available: {remaining} points"
-            self.stdscr.addstr(menu_y, right_x, points_str, curses.color_pair(1) | curses.A_BOLD)
+            self.stdscr.addstr(menu_y, right_x, f"Available: {remaining} points", curses.color_pair(1) | curses.A_BOLD)
             menu_y += 2
             
-            # Show traits
-            display_list = trait_list if category != "Ability" else ABILITIES_LIST
-            max_display = min(len(display_list), container_height - 10)
-            
-            for i in range(max_display):
-                trait = display_list[i]
-                current = self.character.get_trait_data(category, trait)['new']
-                prefix = "► " if i == selected else "  "
-                trait_str = f"{prefix}{trait[:18]:<18} [{current}]"
+            max_display_items = container_height - 10
+            if selected < scroll_offset: scroll_offset = selected
+            if selected >= scroll_offset + max_display_items: scroll_offset = selected - max_display_items + 1
+
+            display_list = trait_list + (["** Add New **"] if can_add else [])
+            for i in range(max_display_items):
+                idx = scroll_offset + i
+                if idx >= len(display_list): break
                 
-                attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
-                self.stdscr.addstr(menu_y + i, right_x, trait_str[:right_width], attr)
-            
-            if can_add:
-                add_idx = len(display_list)
-                if add_idx < container_height - 10:
-                    prefix = "► " if selected == add_idx else "  "
-                    attr = curses.A_REVERSE if selected == add_idx else curses.A_NORMAL
-                    self.stdscr.addstr(menu_y + add_idx, right_x, f"{prefix}** Add New **"[:right_width], attr)
-            
-            # Display message
+                trait_name = display_list[idx]
+                prefix = "► " if idx == selected else "  "
+                
+                if trait_name == "** Add New **":
+                    trait_str = f"{prefix}{trait_name}"
+                else:
+                    current = self.character.get_trait_data(category, trait_name)['new']
+                    trait_str = f"{prefix}{trait_name[:18]:<18} [{current}]"
+                
+                attr = curses.A_REVERSE if idx == selected else curses.A_NORMAL
+                self.stdscr.addstr(menu_y + i, right_x, trait_str, attr)
+
             if self.message:
-                msg_y = start_y + container_height - 2
-                self.stdscr.addstr(msg_y, start_x + 2, self.message[:container_width-4], 
-                                 curses.color_pair(self.message_color))
+                self.stdscr.addstr(start_y + container_height - 2, start_x + 2, self.message, curses.color_pair(self.message_color))
             
-            # Controls
             controls = "↑/↓: Navigate | Enter: Improve | Esc: Back"
             self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(3))
             
             self.stdscr.refresh()
             
-            # Handle input
             key = self.stdscr.getch()
             
-            if key == curses.KEY_UP:
-                max_idx = len(display_list) + (1 if can_add else 0) - 1
-                selected = (selected - 1) % (max_idx + 1)
+            if key == curses.KEY_RESIZE:
+                self.message = ""
+                continue
+            elif key == curses.KEY_UP:
+                selected = (selected - 1 + len(display_list)) % len(display_list)
                 self.message = ""
             elif key == curses.KEY_DOWN:
-                max_idx = len(display_list) + (1 if can_add else 0) - 1
-                selected = (selected + 1) % (max_idx + 1)
+                selected = (selected + 1) % len(display_list)
                 self.message = ""
             elif key == ord('\n'):
-                if can_add and selected == len(display_list):
-                    # Add new
+                if can_add and selected == len(trait_list):
                     new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2)
                     if new_name:
+                        self.character.set_initial_trait(category.lower(), new_name, 0)
+                        trait_list.append(new_name)
                         self.improve_single_trait(category, new_name)
-                elif selected < len(display_list):
-                    self.improve_single_trait(category, display_list[selected])
+                elif selected < len(trait_list):
+                    self.improve_single_trait(category, trait_list[selected])
             elif key == 27:  # Escape
                 self.message = ""
                 return
@@ -742,16 +511,11 @@ class TUIApp:
         
         h, w = self.stdscr.getmaxyx()
         
-        # Create a centered input dialog
-        dialog_width = 50
-        dialog_height = 8
-        dialog_x = (w - dialog_width) // 2
-        dialog_y = (h - dialog_height) // 2
+        dialog_width, dialog_height = 50, 8
+        dialog_x, dialog_y = (w - dialog_width) // 2, (h - dialog_height) // 2
         
-        # Draw dialog box
         self.draw_box(dialog_y, dialog_x, dialog_height, dialog_width, "Improve Trait")
         
-        # Show current value and prompt
         self.stdscr.addstr(dialog_y + 2, dialog_x + 2, f"Trait: {trait_name}", curses.color_pair(3))
         self.stdscr.addstr(dialog_y + 3, dialog_x + 2, f"Current: [{current}]", curses.color_pair(1))
         self.stdscr.addstr(dialog_y + 4, dialog_x + 2, f"Max: {max_val}", curses.color_pair(3))
@@ -769,24 +533,88 @@ class TUIApp:
             return
         
         self.main_menu()
-        
-        # Final display
-        self.stdscr.clear()
-        self.display_character_sheet()
-        self.stdscr.addstr(self.stdscr.getmaxyx()[0] - 2, 2, "Character creation complete! Press any key to exit...", 
-                          curses.color_pair(1) | curses.A_BOLD)
-        self.stdscr.refresh()
-        self.stdscr.getch()
+        self.show_final_sheet()
 
-# --- MAIN APP ---
+    def show_final_sheet(self):
+        """Display the final character sheet before exiting."""
+        while True:
+            self.stdscr.clear()
+            h, w = self.stdscr.getmaxyx()
+
+            container_width = min(90, w - 10)
+            container_height = min(55, h - 6)
+            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
+            
+            self.draw_box(start_y, start_x, container_height, container_width, "FINAL CHARACTER SHEET")
+            
+            sheet_x, sheet_y = start_x + 2, start_y + 2
+            
+            self.stdscr.addstr(sheet_y, sheet_x, f"{self.character.name} ({self.character.clan})", curses.color_pair(5) | curses.A_BOLD)
+            sheet_y += 1
+            self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", curses.color_pair(3))
+            sheet_y += 1
+            
+            remaining = self.character.total_freebies - self.character.spent_freebies
+            spent_str = f"Freebie Points: {self.character.spent_freebies}/{self.character.total_freebies} spent"
+            if remaining > 0: spent_str += f" ({remaining} remaining)"
+            self.stdscr.addstr(sheet_y, sheet_x, spent_str, curses.color_pair(1) if remaining == 0 else curses.color_pair(3) | curses.A_BOLD)
+            sheet_y += 2
+            
+            left_col_x, right_col_x = sheet_x, sheet_x + 40
+            
+            # Left Column
+            col_y_left = sheet_y
+            self.stdscr.addstr(col_y_left, left_col_x, "═══ ATTRIBUTES ═══", curses.color_pair(4) | curses.A_BOLD)
+            col_y_left += 1
+            for name, data in self.character.attributes.items():
+                self.display_trait(col_y_left, left_col_x, name, data, 38); col_y_left += 1
+            
+            col_y_left += 1
+            self.stdscr.addstr(col_y_left, left_col_x, "═══ ABILITIES ═══", curses.color_pair(4) | curses.A_BOLD)
+            col_y_left += 1
+            abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
+            for name, data in abilities_shown:
+                self.display_trait(col_y_left, left_col_x, name, data, 38); col_y_left += 1
+
+            # Right Column
+            col_y_right = sheet_y
+            for cat_name in ["disciplines", "backgrounds"]:
+                category = getattr(self.character, cat_name)
+                if category:
+                    self.stdscr.addstr(col_y_right, right_col_x, f"═══ {cat_name.upper()} ═══", curses.color_pair(4) | curses.A_BOLD)
+                    col_y_right += 1
+                    for name, data in category.items():
+                        self.display_trait(col_y_right, right_col_x, name, data, 38); col_y_right += 1
+                    col_y_right += 1
+
+            self.stdscr.addstr(col_y_right, right_col_x, "═══ VIRTUES & PATH ═══", curses.color_pair(4) | curses.A_BOLD)
+            col_y_right += 1
+            for name, data in self.character.virtues.items():
+                self.display_trait(col_y_right, right_col_x, name, data, 38); col_y_right += 1
+            self.display_trait(col_y_right, right_col_x, "Humanity", self.character.humanity, 38); col_y_right += 1
+            self.display_trait(col_y_right, right_col_x, "Willpower", self.character.willpower, 38)
+            
+            exit_msg = "Press any key to exit the program..."
+            self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(exit_msg)) // 2, exit_msg, curses.color_pair(1) | curses.A_BOLD)
+            
+            self.stdscr.refresh()
+            
+            if self.stdscr.getch(): return
+
+
 def main(stdscr):
+    """The main entry point for the curses application."""
     app = TUIApp(stdscr)
     app.run()
 
-# --- MAIN EXECUTION ---
+
 if __name__ == "__main__":
     try:
         curses.wrapper(main)
     except KeyboardInterrupt:
         print("\nExiting program. Goodbye!")
         sys.exit(0)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        input(f"\nAn error occurred: {e}. Press Enter to exit.")

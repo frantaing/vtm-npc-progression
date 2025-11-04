@@ -7,7 +7,7 @@ This module contains the character data and business logic for the tool. It is i
 user interface.
 """
 
-# --- [IMPORT] ---
+# --- [IMPORTS] ---
 from typing import Dict, List, Tuple
 
 # --- [DATA] ---
