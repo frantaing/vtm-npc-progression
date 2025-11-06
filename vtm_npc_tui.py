@@ -237,11 +237,12 @@ class TUIApp:
             container_width, container_height = 60, 15
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             self.draw_box(start_y, start_x, container_height, container_width, "Final Values")
-            list_y = start_y + 2
+            self.stdscr.addstr(start_y + 2, start_x + 2, "Set virtue values (1-10)", curses.color_pair(3)) # FIXED: Header now always present
+            list_y = start_y + 4
             for name, value in entered_virtues.items():
                 self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1)); list_y += 1
             if humanity is not None:
-                self.stdscr.addstr(list_y + 1, start_x + 2, f"Humanity/Path: {humanity}")
+                self.stdscr.addstr(list_y + 1, start_x + 2, f"Humanity/Path: {humanity}", curses.color_pair(1)) # FIXED: Added green color
             return start_y, start_x, list_y + 1
 
         humanity = None
@@ -257,7 +258,6 @@ class TUIApp:
         self.character.set_initial_value("willpower", willpower)
 
     def display_character_sheet(self, y: int, x: int, width: int, height: int):
-        """Displays character sheet with a dynamic two-column layout."""
         self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], curses.color_pair(5) | curses.A_BOLD); y += 1
         self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], curses.color_pair(3)); y += 1
         remaining = self.character.total_freebies - self.character.spent_freebies
@@ -320,8 +320,7 @@ class TUIApp:
         while True:
             h, w = self.stdscr.getmaxyx()
             self.stdscr.clear()
-            container_width = min(110, w - 4)
-            container_height = min(50, h - 6)
+            container_width, container_height = min(110, w - 4), min(50, h - 6)
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             self.draw_box(start_y, start_x, container_height, container_width, "VTM Elder Creator")
             
@@ -370,23 +369,16 @@ class TUIApp:
             self.stdscr.clear()
             container_width = min(110, w - 4); container_height = min(50, h - 6)
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-            
             right_panel_width, left_panel_width = 32, container_width - 32 - 5
             panel_content_height = container_height - 6
-
             self.draw_box(start_y, start_x, container_height, container_width, f"Improve {label}")
             self.display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
-            
             for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(4))
-
             right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
-            
             self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies} points", curses.color_pair(1) | curses.A_BOLD); menu_y += 2
-            
             max_display_items = container_height - 12
             if selected < scroll_offset: scroll_offset = selected
             if selected >= scroll_offset + max_display_items: scroll_offset = selected - max_display_items + 1
-
             display_list = trait_list + (["** Add New **"] if can_add else [])
             for i in range(max_display_items):
                 idx = scroll_offset + i
@@ -398,16 +390,13 @@ class TUIApp:
                     current = self.character.get_trait_data(category, trait_name)['new']
                     trait_str = f"{prefix}{trait_name[:18]:<18} [{current}]"
                 self.stdscr.addstr(menu_y + i, right_x, trait_str[:right_panel_width], curses.A_REVERSE if idx == selected else curses.A_NORMAL)
-
             if self.message:
                 msg_y = start_y + container_height - 2
                 wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
                 msg_start_y = msg_y - (len(wrapped_lines) - 1)
                 self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
-            
             self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", curses.color_pair(3))
             self.stdscr.refresh()
-            
             key = self.stdscr.getch()
             if key == 24: raise QuitApplication()
             elif key == curses.KEY_RESIZE: self.message = ""
@@ -415,7 +404,7 @@ class TUIApp:
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(display_list); self.message = ""
             elif key == ord('\n'):
                 if can_add and selected == len(trait_list):
-                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2, self.main_menu)
+                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2, lambda: self.handle_improvement_menu(label, category))
                     if new_name and new_name.lower() != 'done':
                         self.character.set_initial_trait(category.lower() + 's', new_name, 0)
                         trait_list.append(new_name)
@@ -425,15 +414,11 @@ class TUIApp:
 
     def improve_single_trait(self, parent_label: str, category: str, trait_name: str):
         trait_data = self.character.get_trait_data(category, trait_name)
-        current = trait_data['new']
-        max_val = self.character.max_trait_rating
+        current, max_val = trait_data['new'], self.character.max_trait_rating
+        if current >= max_val: self.show_popup("Trait at Maximum", f"{trait_name} is already at its maximum value of {max_val}."); return
         
-        if current >= max_val:
-            self.show_popup("Trait at Maximum", f"{trait_name} is already at its maximum value of {max_val}.")
-            return
-        
-        def draw_improve_screen():
-            self.handle_improvement_menu(parent_label, category)
+        def draw_improve_screen(label=parent_label, cat=category):
+            self.handle_improvement_menu(label, cat)
             h, w = self.stdscr.getmaxyx()
             dialog_width, dialog_height = 50, 8
             dialog_x, dialog_y = (w - dialog_width) // 2, (h - dialog_height) // 2
@@ -460,7 +445,6 @@ class TUIApp:
             self.main_menu()
         except QuitApplication:
             pass
-        
         if self.character:
             self.show_final_sheet()
 
@@ -477,18 +461,16 @@ class TUIApp:
             
             sheet_y, sheet_x = start_y + 2, start_x + 2
             
-            # --- This is the ONLY place the header is drawn for the final sheet ---
             self.stdscr.addstr(sheet_y, sheet_x, f"{self.character.name} ({self.character.clan})", curses.color_pair(5) | curses.A_BOLD); sheet_y += 1
             self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", curses.color_pair(3)); sheet_y += 1
             remaining = self.character.total_freebies - self.character.spent_freebies
             spent_str = f"Freebie Points: {self.character.spent_freebies}/{self.character.total_freebies} spent" + (f" ({remaining} remaining)" if remaining > 0 else "")
             self.stdscr.addstr(sheet_y, sheet_x, spent_str, (curses.color_pair(1) if remaining == 0 else curses.color_pair(3)) | curses.A_BOLD); sheet_y += 2
             
-            # --- Column Drawing Logic is now self-contained in this method ---
-            start_draw_y, max_draw_y = sheet_y, start_y + container_height - 2
+            start_draw_y, max_draw_y = sheet_y, start_y + container_height - 3
             col1_x, col_width = sheet_x, 28
             col2_x = sheet_x + col_width + 2
-            
+
             y_left = start_draw_y
             self.stdscr.addstr(y_left, col1_x, "═══ ATTRIBUTES ═══", curses.color_pair(4) | curses.A_BOLD); y_left += 1
             for n, d in self.character.attributes.items():
@@ -517,7 +499,7 @@ class TUIApp:
                     self.display_trait(y_right, col2_x, n, d, col_width); y_right += 1
                 if y_right < max_draw_y: self.display_trait(y_right, col2_x, "Humanity", self.character.humanity, col_width); y_right += 1
                 if y_right < max_draw_y: self.display_trait(y_right, col2_x, "Willpower", self.character.willpower, col_width)
-
+            
             exit_msg = "Press any key to exit the program..."
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(exit_msg)) // 2, exit_msg, curses.color_pair(1) | curses.A_BOLD)
             self.stdscr.refresh()
