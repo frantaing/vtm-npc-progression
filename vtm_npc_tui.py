@@ -229,32 +229,51 @@ class TUIApp:
         run_setup_loop("Abilities", ABILITIES_LIST, 0, 10)
         run_setup_loop("Disciplines", [], 1, 10, is_freeform=True)
         run_setup_loop("Backgrounds", [], 1, 10, is_freeform=True)
-        entered_virtues = run_setup_loop("Virtues", VIRTUES_LIST, 1, 10)
+
+        # --- [FIXED] --- Unified Virtues, Humanity, and Willpower setup
         
-        def draw_final_values(humanity: Optional[int] = None):
+        entered_virtues: Dict[str, Any] = {}
+        humanity: Optional[int] = None
+        willpower: Optional[int] = None
+
+        def draw_virtues_screen():
             h, w = self.stdscr.getmaxyx()
             self.stdscr.clear()
-            container_width, container_height = 60, 15
+            container_width, container_height = 60, 20  # Consistent height
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-            self.draw_box(start_y, start_x, container_height, container_width, "Final Values")
-            self.stdscr.addstr(start_y + 2, start_x + 2, "Set virtue values (1-10)", curses.color_pair(3)) # FIXED: Header now always present
+            self.draw_box(start_y, start_x, container_height, container_width, "Virtues & Path")
+            self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial values (1-10)", curses.color_pair(3))
+            
             list_y = start_y + 4
             for name, value in entered_virtues.items():
                 self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1)); list_y += 1
+            
             if humanity is not None:
-                self.stdscr.addstr(list_y + 1, start_x + 2, f"Humanity/Path: {humanity}", curses.color_pair(1)) # FIXED: Added green color
-            return start_y, start_x, list_y + 1
+                self.stdscr.addstr(list_y, start_x + 2, f"Humanity/Path: {humanity}", curses.color_pair(1)); list_y += 1
+            if willpower is not None:
+                self.stdscr.addstr(list_y, start_x + 2, f"Willpower: {willpower}", curses.color_pair(1)); list_y += 1
+            
+            return start_y, start_x, list_y
 
-        humanity = None
+        # Get Virtues
+        for virtue in VIRTUES_LIST:
+            val = None
+            while val is None:
+                start_y, start_x, list_y = draw_virtues_screen()
+                val = self.get_number_input(f"{virtue}: ", list_y, start_x + 2, 1, 10, draw_virtues_screen)
+            entered_virtues[virtue] = val
+            self.character.set_initial_trait("virtues", virtue, val)
+        
+        # Get Humanity
         while humanity is None:
-            start_y, start_x, list_y = draw_final_values()
-            humanity = self.get_number_input("Humanity/Path: ", list_y, start_x + 2, 1, 10, draw_final_values)
+            start_y, start_x, list_y = draw_virtues_screen()
+            humanity = self.get_number_input("Humanity/Path: ", list_y, start_x + 2, 1, 10, draw_virtues_screen)
         self.character.set_initial_value("humanity", humanity)
 
-        willpower = None
+        # Get Willpower
         while willpower is None:
-            start_y, start_x, list_y = draw_final_values(humanity=humanity)
-            willpower = self.get_number_input("Willpower: ", list_y + 1, start_x + 2, 1, 10, draw_final_values, humanity=humanity)
+            start_y, start_x, list_y = draw_virtues_screen()
+            willpower = self.get_number_input("Willpower: ", list_y, start_x + 2, 1, 10, draw_virtues_screen)
         self.character.set_initial_value("willpower", willpower)
 
     def display_character_sheet(self, y: int, x: int, width: int, height: int):
@@ -404,7 +423,7 @@ class TUIApp:
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(display_list); self.message = ""
             elif key == ord('\n'):
                 if can_add and selected == len(trait_list):
-                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2, lambda: self.handle_improvement_menu(label, category))
+                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2, self.main_menu)
                     if new_name and new_name.lower() != 'done':
                         self.character.set_initial_trait(category.lower() + 's', new_name, 0)
                         trait_list.append(new_name)
