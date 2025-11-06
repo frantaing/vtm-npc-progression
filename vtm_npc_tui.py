@@ -69,7 +69,7 @@ class TUIApp:
         """
         Get string input from the user, building it character by character.
         - Does not accept empty strings on Enter.
-        - Raises QuitApplication if Ctrl+Q is pressed.
+        - Raises QuitApplication if Ctrl+X is pressed.
         """
         curses.curs_set(1)
         
@@ -86,7 +86,7 @@ class TUIApp:
 
             key = self.stdscr.getch()
 
-            if key == 17: # Ctrl+Q
+            if key == 24: # Ctrl+X
                 raise QuitApplication()
             
             elif key in (curses.KEY_ENTER, ord('\n')):
@@ -183,7 +183,7 @@ class TUIApp:
         self.stdscr.addstr(list_y, start_x + 2, "Press any key to set initial traits...", curses.color_pair(3))
         self.stdscr.refresh()
         key = self.stdscr.getch()
-        if key == 17: raise QuitApplication()
+        if key == 24: raise QuitApplication()
 
         self.setup_initial_traits()
 
@@ -337,7 +337,7 @@ class TUIApp:
             self.stdscr.addstr(y, x, trait_str[:width], curses.color_pair(1))
 
     def main_menu(self):
-        """Main menu loop. Returns when user presses Ctrl+Q."""
+        """Main menu loop. Returns when user presses Ctrl+X."""
         selected = 0
         menu_items = [
             ("Attributes", "Attribute"), ("Abilities", "Ability"),
@@ -379,7 +379,7 @@ class TUIApp:
             if self.message:
                 self.stdscr.addstr(start_y + container_height - 2, start_x + 2, self.message, curses.color_pair(self.message_color))
             
-            controls = "↑/↓: Navigate | Enter: Select | Ctrl+Q: Finalize & Exit"
+            controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
             self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(3))
             
             self.stdscr.refresh()
@@ -390,11 +390,11 @@ class TUIApp:
             elif key == curses.KEY_UP: selected = (selected - 1 + len(menu_items)) % len(menu_items); self.message = ""
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(menu_items); self.message = ""
             elif key == ord('\n'): self.handle_improvement_menu(menu_items[selected][0], menu_items[selected][1])
-            elif key == 17:  # Ctrl+Q
+            elif key == 24:  # Ctrl+X
                 return # Exit the main menu loop to show final sheet
 
     def handle_improvement_menu(self, label: str, category: str):
-        # QuitApplication on Ctrl+Q
+        # QuitApplication on Ctrl+X
         trait_list_map = {
             "Attribute": ATTRIBUTES_LIST, "Ability": ABILITIES_LIST,
             "Discipline": list(self.character.disciplines.keys()),
@@ -456,7 +456,7 @@ class TUIApp:
             
             key = self.stdscr.getch()
             
-            if key == 17: raise QuitApplication()
+            if key == 24: raise QuitApplication()
             elif key == curses.KEY_RESIZE: self.message = ""
             elif key == curses.KEY_UP: selected = (selected - 1 + len(display_list)) % len(display_list); self.message = ""
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(display_list); self.message = ""
@@ -472,7 +472,7 @@ class TUIApp:
             elif key == 27: self.message = ""; return
 
     def improve_single_trait(self, category: str, trait_name: str):
-        # QuitApplication on Ctrl+Q
+        # QuitApplication on Ctrl+X
         trait_data = self.character.get_trait_data(category, trait_name)
         current = trait_data['new']
         max_val = self.character.max_trait_rating
@@ -500,15 +500,15 @@ class TUIApp:
     def run(self):
         """Main application orchestrator."""
         try:
-            # Ctrl+Q here will raise QuitApplication and exit immediately.
+            # Ctrl+X here will raise QuitApplication and exit immediately.
             self.setup_character()
         except QuitApplication:
             return # Exit the run method entirely
 
-        # Ctrl+Q here returns from the method.
+        # Ctrl+X here returns from the method.
         self.main_menu()
         
-        # Final display. This is shown after Ctrl+Q in the main menu.
+        # Final display. This is shown after Ctrl+X in the main menu.
         self.show_final_sheet()
 
     def show_final_sheet(self):
