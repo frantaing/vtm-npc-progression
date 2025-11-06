@@ -289,7 +289,6 @@ class TUIApp:
         self.character.set_initial_value("willpower", willpower)
 
     def display_character_sheet(self, y: int, x: int, width: int):
-        # This method is unchanged
         start_y = y
         header = f"{self.character.name} ({self.character.clan})"
         self.stdscr.addstr(y, x, header[:width], curses.color_pair(5) | curses.A_BOLD); y += 1
@@ -328,7 +327,6 @@ class TUIApp:
         self.display_trait(y, x, "Willpower", self.character.willpower, width)
 
     def display_trait(self, y: int, x: int, name: str, data: Dict, width: int = 30):
-        # This method is unchanged
         if data['base'] == data['new']:
             trait_str = f"{name[:15]:<15} [{data['new']}]"
             self.stdscr.addstr(y, x, trait_str[:width])
@@ -394,7 +392,6 @@ class TUIApp:
                 return # Exit the main menu loop to show final sheet
 
     def handle_improvement_menu(self, label: str, category: str):
-        # QuitApplication on Ctrl+X
         trait_list_map = {
             "Attribute": ATTRIBUTES_LIST, "Ability": ABILITIES_LIST,
             "Discipline": list(self.character.disciplines.keys()),
@@ -464,7 +461,10 @@ class TUIApp:
                 if can_add and selected == len(trait_list):
                     new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2)
                     if new_name and new_name.lower() != 'done':
-                        self.character.set_initial_trait(category.lower(), new_name, 0)
+                        # --- [FIXED LINE] ---
+                        # Use category.lower() + 's' to form the plural attribute name
+                        # e.g., "discipline" + "s" -> "disciplines"
+                        self.character.set_initial_trait(category.lower() + 's', new_name, 0)
                         trait_list.append(new_name)
                         self.improve_single_trait(category, new_name)
                 elif selected < len(trait_list):
@@ -472,7 +472,6 @@ class TUIApp:
             elif key == 27: self.message = ""; return
 
     def improve_single_trait(self, category: str, trait_name: str):
-        # QuitApplication on Ctrl+X
         trait_data = self.character.get_trait_data(category, trait_name)
         current = trait_data['new']
         max_val = self.character.max_trait_rating
