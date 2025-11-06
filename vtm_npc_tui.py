@@ -73,6 +73,26 @@ class TUIApp:
         for i, line in enumerate(wrapped_lines):
             self.stdscr.addstr(y + i, x, line, color)
 
+    def show_popup(self, title: str, message: str, color: int = 2):
+        """Displays a modal pop-up and waits for a key press to dismiss."""
+        h, w = self.stdscr.getmaxyx()
+        
+        wrapped_lines = textwrap.wrap(message, 40)
+        dialog_height = len(wrapped_lines) + 4
+        dialog_width = max(len(line) for line in wrapped_lines) + 4
+        
+        dialog_y = (h - dialog_height) // 2
+        dialog_x = (w - dialog_width) // 2
+        
+        self.draw_box(dialog_y, dialog_x, dialog_height, dialog_width, title)
+        self.draw_wrapped_text(dialog_y + 2, dialog_x + 2, message, dialog_width - 4, color)
+        
+        dismiss_msg = "Press any key to continue..."
+        self.stdscr.addstr(dialog_y + dialog_height - 2, dialog_x + (dialog_width - len(dismiss_msg)) // 2, dismiss_msg, curses.color_pair(3))
+        
+        self.stdscr.refresh()
+        self.stdscr.getch()
+
     def get_string_input(self, prompt: str, y: int, x: int) -> str:
         """
         Get string input from the user, building it character by character.
@@ -120,13 +140,9 @@ class TUIApp:
                 if min_val <= val <= max_val:
                     return val
                 
-                self.show_message(f"Please enter a number between {min_val} and {max_val}", 2)
-                self.stdscr.refresh()
-                curses.napms(1500)
+                self.show_popup("Invalid Range", f"Please enter a number between {min_val} and {max_val}.")
             except ValueError:
-                self.show_message("Invalid input. Please enter a number.", 2)
-                self.stdscr.refresh()
-                curses.napms(1500)
+                self.show_popup("Invalid Input", "That is not a valid number. Please try again.")
 
     def setup_character(self):
         """Initial character setup screen. Returns on completion, raises QuitApplication on exit."""
@@ -350,9 +366,9 @@ class TUIApp:
             
             if self.message:
                 msg_y = start_y + container_height - 2
-                wrapped_lines = textwrap.wrap(self.message, right_panel_width)
+                wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
                 msg_start_y = msg_y - (len(wrapped_lines) - 1)
-                self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width, self.message_color)
+                self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
             
             controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
             self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(3))
@@ -412,9 +428,9 @@ class TUIApp:
 
             if self.message:
                 msg_y = start_y + container_height - 2
-                wrapped_lines = textwrap.wrap(self.message, right_panel_width)
+                wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
                 msg_start_y = msg_y - (len(wrapped_lines) - 1)
-                self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width, self.message_color)
+                self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
             
             self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", curses.color_pair(3))
             self.stdscr.refresh()
@@ -435,9 +451,13 @@ class TUIApp:
             elif key == 27: self.message = ""; return
 
     def improve_single_trait(self, category: str, trait_name: str):
-        current = self.character.get_trait_data(category, trait_name)['new']
+        trait_data = self.character.get_trait_data(category, trait_name)
+        current = trait_data['new']
         max_val = self.character.max_trait_rating
-        if current >= max_val: self.show_message(f"{trait_name} is already at maximum ({max_val})", 2); return
+        
+        if current >= max_val:
+            self.show_popup("Trait at Maximum", f"{trait_name} is already at its maximum value of {max_val}.")
+            return
         
         h, w = self.stdscr.getmaxyx()
         dialog_width, dialog_height = 50, 8
@@ -449,8 +469,12 @@ class TUIApp:
         self.stdscr.addstr(dialog_y + 4, dialog_x + 2, f"Max: {max_val}", curses.color_pair(3))
         
         target = self.get_number_input(f"New value ({current+1}-{max_val}): ", dialog_y + 5, dialog_x + 2, current + 1, max_val)
+        
         success, msg = self.character.improve_trait(category, trait_name, target)
-        self.show_message(msg, 1 if success else 2)
+        if success:
+            self.show_message(msg, 1) # Success is a toast
+        else:
+            self.show_popup("Error", msg, 2) # Failure is a pop-up
 
     def run(self):
         """Main application orchestrator."""
