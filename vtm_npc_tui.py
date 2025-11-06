@@ -10,9 +10,9 @@ user input, and uses on vtm_npc_logic.py for character management.
 # --- [IMPORTS] ---
 import curses
 import sys
-import textwrap                                 # Import the textwrap module for notifs
+import textwrap
 from typing import Dict, Optional
-from vtm_npc_logic import (                     # Import from vtm_npc_logic.py
+from vtm_npc_logic import ( # Import from vtm_npc_logic.py
     VtMCharacter,
     ATTRIBUTES_LIST,
     ABILITIES_LIST,
@@ -65,20 +65,12 @@ class TUIApp:
             title_str = f" {title} "
             self.stdscr.addstr(y, x + 2, title_str, curses.color_pair(3) | curses.A_BOLD)
         self.stdscr.attroff(curses.color_pair(4))
-        
-    # For drawing wrapped text notifications
-    def draw_wrapped_text(self, y: int, x: int, text: str, width: int, color_id: int):
-        """Clears an area and draws multi-line text."""
-        color = curses.color_pair(color_id)
-        
-        # Clear the message area (e.g., 3 lines high) before drawing
-        for i in range(3):
-            self.stdscr.addstr(y + i, x, " " * width)
-            
-        # Wrap the text and draw each line
+
+    def draw_wrapped_text(self, y, x, text, width, color_pair_num=1):
+        """Draws text that wraps within a given width at a specified position."""
+        color = curses.color_pair(color_pair_num)
         wrapped_lines = textwrap.wrap(text, width)
         for i, line in enumerate(wrapped_lines):
-            if i >= 3: break # Don't draw more than 3 lines
             self.stdscr.addstr(y + i, x, line, color)
 
     def get_string_input(self, prompt: str, y: int, x: int) -> str:
@@ -275,43 +267,42 @@ class TUIApp:
         self.stdscr.addstr(y, x, f"Freebie: {remaining}/{self.character.total_freebies}", (curses.color_pair(1) if remaining > 0 else curses.color_pair(2)) | curses.A_BOLD); y += 2
 
         start_y, max_y = y, y + height
-        col1_x, col2_x = x, x + 30
-        col_width = 28
+        col1_x, col_width = x, 28
+        col2_x = x + col_width + 2
 
         y_left = start_y
         self.stdscr.addstr(y_left, col1_x, "═══ ATTRIBUTES ═══", curses.color_pair(4) | curses.A_BOLD); y_left += 1
         for name, data in self.character.attributes.items():
             if y_left > max_y: break
             self.display_trait(y_left, col1_x, name, data, col_width); y_left += 1
-        
         y_left += 1
-        if y_left > max_y: return
-        self.stdscr.addstr(y_left, col1_x, "═══ ABILITIES ═══", curses.color_pair(4) | curses.A_BOLD); y_left += 1
-        abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
-        for name, data in abilities_shown:
-            if y_left > max_y: break
-            self.display_trait(y_left, col1_x, name, data, col_width); y_left += 1
+        if y_left <= max_y:
+            self.stdscr.addstr(y_left, col1_x, "═══ ABILITIES ═══", curses.color_pair(4) | curses.A_BOLD); y_left += 1
+            abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
+            for name, data in abilities_shown:
+                if y_left > max_y: break
+                self.display_trait(y_left, col1_x, name, data, col_width); y_left += 1
 
         y_right = start_y
         for cat_name in ["disciplines", "backgrounds"]:
-            if category := getattr(self.character, cat_name):
-                if y_right > max_y: break
+            category = getattr(self.character, cat_name)
+            if category and y_right <= max_y:
                 self.stdscr.addstr(y_right, col2_x, f"═══ {cat_name.upper()} ═══", curses.color_pair(4) | curses.A_BOLD); y_right += 1
                 for name, data in category.items():
                     if y_right > max_y: break
                     self.display_trait(y_right, col2_x, name, data, col_width); y_right += 1
                 y_right += 1
-
-        if y_right > max_y: return
-        self.stdscr.addstr(y_right, col2_x, "═══ VIRTUES & PATH ═══", curses.color_pair(4) | curses.A_BOLD); y_right += 1
-        for name, data in self.character.virtues.items():
-            if y_right > max_y: break
-            self.display_trait(y_right, col2_x, name, data, col_width); y_right += 1
-        if y_right <= max_y: self.display_trait(y_right, col2_x, "Humanity", self.character.humanity, col_width); y_right += 1
-        if y_right <= max_y: self.display_trait(y_right, col2_x, "Willpower", self.character.willpower, col_width)
+        
+        if y_right <= max_y:
+            self.stdscr.addstr(y_right, col2_x, "═══ VIRTUES & PATH ═══", curses.color_pair(4) | curses.A_BOLD); y_right += 1
+            for name, data in self.character.virtues.items():
+                if y_right > max_y: break
+                self.display_trait(y_right, col2_x, name, data, col_width); y_right += 1
+            if y_right <= max_y: self.display_trait(y_right, col2_x, "Humanity", self.character.humanity, col_width); y_right += 1
+            if y_right <= max_y: self.display_trait(y_right, col2_x, "Willpower", self.character.willpower, col_width)
 
     def display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
-        max_name_len = width - 10 
+        max_name_len = width - 9
         name_part = f"{name[:max_name_len]:<{max_name_len}}"
         if data['base'] == data['new']:
             trait_str = f"{name_part} [{data['new']}]"
@@ -333,23 +324,22 @@ class TUIApp:
             h, w = self.stdscr.getmaxyx()
             self.stdscr.clear()
 
-            container_width = min(100, w - 10)
+            container_width = min(110, w - 4)
             container_height = min(50, h - 6)
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             
             self.draw_box(start_y, start_x, container_height, container_width, "VTM Elder Creator")
             
             right_panel_width = 32
-            left_panel_width = container_width - right_panel_width - 3
+            left_panel_width = container_width - right_panel_width - 5
             panel_content_height = container_height - 6
 
             self.display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
             
             for i in range(1, container_height - 1):
-                self.stdscr.addstr(start_y + i, start_x + left_panel_width + 1, "│", curses.color_pair(4))
+                self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(4))
             
-            right_x = start_x + left_panel_width + 3
-            menu_y = start_y + 2
+            right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
             
             self.stdscr.addstr(menu_y, right_x, "SPEND FREEBIE POINTS", curses.color_pair(3) | curses.A_BOLD); menu_y += 2
             
@@ -358,13 +348,12 @@ class TUIApp:
                 menu_str = f"{prefix}{label} (Cost: {FREEBIE_COSTS.get(category, 'N/A')}/dot)"
                 self.stdscr.addstr(menu_y + i, right_x, menu_str[:right_panel_width], curses.A_REVERSE if i == selected else curses.A_NORMAL)
             
-            # Draw the wrapped message in the right panel
             if self.message:
-                msg_y = menu_y + len(menu_items) + 1
-                msg_width = right_panel_width - 1
-                if msg_y < start_y + container_height - 4:
-                    self.draw_wrapped_text(msg_y, right_x, self.message, msg_width, self.message_color)
-
+                msg_y = start_y + container_height - 2
+                wrapped_lines = textwrap.wrap(self.message, right_panel_width)
+                msg_start_y = msg_y - (len(wrapped_lines) - 1)
+                self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width, self.message_color)
+            
             controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
             self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(3))
             self.stdscr.refresh()
@@ -388,24 +377,24 @@ class TUIApp:
         while True:
             h, w = self.stdscr.getmaxyx()
             self.stdscr.clear()
-            container_width = min(100, w - 10); container_height = min(50, h - 6)
+            container_width = min(110, w - 4); container_height = min(50, h - 6)
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             
             right_panel_width = 32
-            left_panel_width = container_width - right_panel_width - 3
+            left_panel_width = container_width - right_panel_width - 5
             panel_content_height = container_height - 6
 
             self.draw_box(start_y, start_x, container_height, container_width, f"Improve {label}")
             self.display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
             
             for i in range(1, container_height - 1):
-                self.stdscr.addstr(start_y + i, start_x + left_panel_width + 1, "│", curses.color_pair(4))
+                self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(4))
 
-            right_x, menu_y = start_x + left_panel_width + 3, start_y + 2
+            right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
             
             self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies} points", curses.color_pair(1) | curses.A_BOLD); menu_y += 2
             
-            max_display_items = container_height - 12 # Reserve space for message
+            max_display_items = container_height - 12
             if selected < scroll_offset: scroll_offset = selected
             if selected >= scroll_offset + max_display_items: scroll_offset = selected - max_display_items + 1
 
@@ -421,12 +410,12 @@ class TUIApp:
                     trait_str = f"{prefix}{trait_name[:18]:<18} [{current}]"
                 self.stdscr.addstr(menu_y + i, right_x, trait_str[:right_panel_width], curses.A_REVERSE if idx == selected else curses.A_NORMAL)
 
-            # Draw the wrapped message in the right panel
             if self.message:
-                msg_y = start_y + container_height - 5 # Place message near the bottom of the container
-                msg_width = right_panel_width - 1
-                self.draw_wrapped_text(msg_y, right_x, self.message, msg_width, self.message_color)
-
+                msg_y = start_y + container_height - 2
+                wrapped_lines = textwrap.wrap(self.message, right_panel_width)
+                msg_start_y = msg_y - (len(wrapped_lines) - 1)
+                self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width, self.message_color)
+            
             self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", curses.color_pair(3))
             self.stdscr.refresh()
             
@@ -485,6 +474,12 @@ class TUIApp:
             self.draw_box(start_y, start_x, container_height, container_width, "FINAL CHARACTER SHEET")
             
             sheet_y, sheet_x = start_y + 2, start_x + 2
+            
+            self.stdscr.addstr(sheet_y, sheet_x, f"{self.character.name} ({self.character.clan})", curses.color_pair(5) | curses.A_BOLD); sheet_y += 1
+            self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", curses.color_pair(3)); sheet_y += 1
+            remaining = self.character.total_freebies - self.character.spent_freebies
+            spent_str = f"Freebie Points: {self.character.spent_freebies}/{self.character.total_freebies} spent" + (f" ({remaining} remaining)" if remaining > 0 else "")
+            self.stdscr.addstr(sheet_y, sheet_x, spent_str, (curses.color_pair(1) if remaining == 0 else curses.color_pair(3)) | curses.A_BOLD); sheet_y += 2
             
             panel_width = container_width - 4
             panel_height = container_height - 8
