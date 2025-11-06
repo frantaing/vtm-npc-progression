@@ -11,7 +11,7 @@ user input, and uses on vtm_npc_logic.py for character management.
 import curses
 import sys
 import textwrap
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from vtm_npc_logic import ( # Import from vtm_npc_logic.py
     VtMCharacter,
     ATTRIBUTES_LIST,
@@ -79,25 +79,26 @@ class TUIApp:
         
         wrapped_lines = textwrap.wrap(message, 40)
         dialog_height = len(wrapped_lines) + 4
-        dialog_width = max(len(line) for line in wrapped_lines) + 4
+        dialog_width = 50
         
         dialog_y = (h - dialog_height) // 2
         dialog_x = (w - dialog_width) // 2
         
         self.draw_box(dialog_y, dialog_x, dialog_height, dialog_width, title)
-        self.draw_wrapped_text(dialog_y + 2, dialog_x + 2, message, dialog_width - 4, color)
         
+        for i, line in enumerate(wrapped_lines):
+            self.stdscr.addstr(dialog_y + 2 + i, dialog_x + 2, line, curses.color_pair(color))
+
         dismiss_msg = "Press any key to continue..."
         self.stdscr.addstr(dialog_y + dialog_height - 2, dialog_x + (dialog_width - len(dismiss_msg)) // 2, dismiss_msg, curses.color_pair(3))
         
         self.stdscr.refresh()
         self.stdscr.getch()
 
-    def get_string_input(self, prompt: str, y: int, x: int) -> str:
+    def get_string_input(self, prompt: str, y: int, x: int, current_screen_func, *args, **kwargs) -> str:
         """
         Get string input from the user, building it character by character.
-        - Does not accept empty strings on Enter.
-        - Raises QuitApplication if Ctrl+X is pressed.
+        Redraws the screen behind the prompt on each iteration.
         """
         curses.curs_set(1)
         
@@ -105,6 +106,7 @@ class TUIApp:
         input_x_start = x + len(prompt)
 
         while True:
+            current_screen_func(*args, **kwargs) # Redraw the underlying screen
             self.stdscr.addstr(y, x, prompt, curses.color_pair(3))
             self.stdscr.addstr(y, input_x_start, " " * 30)
             self.stdscr.addstr(y, input_x_start, input_str)
@@ -113,166 +115,153 @@ class TUIApp:
 
             key = self.stdscr.getch()
 
-            if key == 24: # Ctrl+X
-                raise QuitApplication()
-            
-            elif key in (curses.KEY_ENTER, ord('\n')):
-                if input_str:
-                    break
-            
-            elif key in (curses.KEY_BACKSPACE, 127, 8):
-                if input_str:
-                    input_str = input_str[:-1]
-            
-            elif 32 <= key <= 126 and len(input_str) < 30:
-                input_str += chr(key)
+            if key == 24: raise QuitApplication()
+            elif key in (curses.KEY_ENTER, ord('\n')) and input_str: break
+            elif key in (curses.KEY_BACKSPACE, 127, 8): input_str = input_str[:-1]
+            elif 32 <= key <= 126 and len(input_str) < 30: input_str += chr(key)
         
         curses.curs_set(0)
         return input_str.strip()
 
-    def get_number_input(self, prompt: str, y: int, x: int, min_val: int, max_val: int) -> int:
-        """Get validated number input from user. Loops until valid input is given."""
-        while True:
-            try:
-                val_str = self.get_string_input(prompt, y, x)
-                val = int(val_str)
-                
-                if min_val <= val <= max_val:
-                    return val
-                
-                self.show_popup("Invalid Range", f"Please enter a number between {min_val} and {max_val}.")
-            except ValueError:
-                self.show_popup("Invalid Input", "That is not a valid number. Please try again.")
+    def get_number_input(self, prompt: str, y: int, x: int, min_val: int, max_val: int, current_screen_func, *args, **kwargs) -> Optional[int]:
+        """Gets a validated number. On failure, shows a popup and returns None."""
+        try:
+            val_str = self.get_string_input(prompt, y, x, current_screen_func, *args, **kwargs)
+            val = int(val_str)
+            if min_val <= val <= max_val:
+                return val
+            self.show_popup("Invalid Range", f"Please enter a number between {min_val} and {max_val}.")
+            return None
+        except ValueError:
+            self.show_popup("Invalid Input", "That is not a valid number. Please try again.")
+            return None
 
-    def setup_character(self):
-        """Initial character setup screen. Returns on completion, raises QuitApplication on exit."""
-        h, w = self.stdscr.getmaxyx()
-        
-        container_width, container_height = 70, 18
-        start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-        
-        entered_info = {}
+    def setup_character(self) -> bool:
+        """Initial character setup screen. Returns True on completion, False on exit."""
         prompts = [
-            ("Character Name", "name", None, None), ("Clan", "clan", None, None),
-            ("Age (0-5600+)", "age", 0, 10000), ("Generation (2-16)", "generation", 2, 16)
+            ("Character Name", None, None), ("Clan", None, None),
+            ("Age (0-5600+)", 0, 10000), ("Generation (2-16)", 2, 16)
         ]
         
-        for label, key, min_val, max_val in prompts:
+        entered_info = {}
+
+        def draw_setup_screen():
+            h, w = self.stdscr.getmaxyx()
             self.stdscr.clear()
+            container_width, container_height = 70, 18
+            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             title = "VAMPIRE: THE MASQUERADE - NPC PROGRESSION TOOL"
             self.stdscr.addstr(start_y - 3, (w - len(title)) // 2, title, curses.color_pair(5) | curses.A_BOLD)
             self.draw_box(start_y, start_x, container_height, container_width, "Character Setup")
-            
             list_y = start_y + 2
             for info_label, info_value in entered_info.items():
                 self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", curses.color_pair(1)); list_y += 1
-            
-            if min_val is not None:
-                value = self.get_number_input(f"{label}: ", list_y, start_x + 2, min_val, max_val)
-            else:
-                value = self.get_string_input(f"{label}: ", list_y, start_x + 2)
+            return start_y, start_x, list_y
+
+        for label, min_val, max_val in prompts:
+            value = None
+            while value is None:
+                start_y, start_x, list_y = draw_setup_screen()
+                if min_val is not None:
+                    value = self.get_number_input(f"{label}: ", list_y, start_x + 2, min_val, max_val, draw_setup_screen)
+                else:
+                    value = self.get_string_input(f"{label}: ", list_y, start_x + 2, draw_setup_screen)
             entered_info[label] = value
         
-        self.character = VtMCharacter(
-            entered_info["Character Name"], entered_info["Clan"],
-            entered_info["Age (0-5600+)"], entered_info["Generation (2-16)"]
-        )
+        self.character = VtMCharacter(entered_info["Character Name"], entered_info["Clan"], entered_info["Age (0-5600+)"], entered_info["Generation (2-16)"])
         
+        h, w = self.stdscr.getmaxyx()
+        container_width, container_height = 70, 18
+        start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
         self.stdscr.clear()
         self.draw_box(start_y, start_x, container_height, container_width, "Character Created")
         list_y = start_y + 2
         for info_label, info_value in entered_info.items():
             self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", curses.color_pair(1)); list_y += 1
-        
-        list_y += 1
-        self.stdscr.addstr(list_y, start_x + 2, f"Character created with {self.character.total_freebies} Freebie Points!", curses.color_pair(1) | curses.A_BOLD)
+        self.stdscr.addstr(list_y + 1, start_x + 2, f"Character created with {self.character.total_freebies} Freebie Points!", curses.color_pair(1) | curses.A_BOLD)
         self.stdscr.addstr(list_y + 2, start_x + 2, "Press any key to set initial traits...", curses.color_pair(3))
         self.stdscr.refresh()
         if self.stdscr.getch() == 24: raise QuitApplication()
 
         self.setup_initial_traits()
+        return True
 
     def setup_initial_traits(self):
         """Setup initial trait values with list display."""
-        h, w = self.stdscr.getmaxyx()
         
-        # Attributes
-        entered_attrs = {}
-        for attr in ATTRIBUTES_LIST:
-            self.stdscr.clear()
-            container_width, container_height = 60, 20
-            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-            self.draw_box(start_y, start_x, container_height, container_width, "Initial Attributes")
-            self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial attribute values (1-10)", curses.color_pair(3))
-            list_y = start_y + 4
-            for name, value in entered_attrs.items():
-                self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1)); list_y += 1
-            val = self.get_number_input(f"{attr}: ", list_y, start_x + 2, 1, 10)
-            entered_attrs[attr] = val
-            self.character.set_initial_trait("attributes", attr, val)
-        
-        # Abilities
-        entered_abils = {}
-        for abil in ABILITIES_LIST:
-            self.stdscr.clear()
-            container_width, container_height = 60, min(40, h - 4)
-            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-            self.draw_box(start_y, start_x, container_height, container_width, "Initial Abilities")
-            self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial ability values (0-10)", curses.color_pair(3))
-            list_y = start_y + 4
-            max_display = container_height - 8
-            start_idx = max(0, len(entered_abils) - max_display + 1)
-            for name, value in list(entered_abils.items())[start_idx:]:
-                if list_y >= start_y + container_height - 4: break
-                self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1)); list_y += 1
-            val = self.get_number_input(f"{abil}: ", list_y, start_x + 2, 0, 10)
-            entered_abils[abil] = val
-            self.character.set_initial_trait("abilities", abil, val)
-        
-        # Disciplines & Backgrounds
-        for trait_type in ["Disciplines", "Backgrounds"]:
+        def run_setup_loop(title_text, item_list, min_val, max_val, is_freeform=False):
             entered_items = {}
-            while True:
+            
+            def draw_loop_screen():
+                h, w = self.stdscr.getmaxyx()
                 self.stdscr.clear()
-                container_width, container_height = 60, 25
+                container_width, container_height = 60, min(40, h-4)
                 start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-                self.draw_box(start_y, start_x, container_height, container_width, f"Initial {trait_type}")
-                self.stdscr.addstr(start_y + 2, start_x + 2, "Enter names, or type 'done' to finish", curses.color_pair(3))
-                list_y = start_y + 4
-                for name, value in entered_items.items():
+                self.draw_box(start_y, start_x, container_height, container_width, title_text)
+                self.stdscr.addstr(start_y + 2, start_x + 2, f"Set initial values ({min_val}-{max_val})", curses.color_pair(3))
+                if is_freeform: self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' to finish.", curses.color_pair(3))
+
+                list_y = start_y + 5
+                max_display = container_height - 8
+                start_idx = max(0, len(entered_items) - max_display + 1)
+                for name, value in list(entered_items.items())[start_idx:]:
+                    if list_y >= start_y + container_height - 2: break
                     self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1)); list_y += 1
-                item_name = self.get_string_input(f"{trait_type[:-1]} Name: ", list_y, start_x + 2)
-                if item_name.lower() == 'done': break
-                val = self.get_number_input("  Value: ", list_y + 1, start_x + 2, 1, 10)
-                entered_items[item_name] = val
-                self.character.set_initial_trait(trait_type.lower(), item_name, val)
+                return start_y, start_x, list_y
+
+            if is_freeform:
+                while True:
+                    start_y, start_x, list_y = draw_loop_screen()
+                    prompt = f"{title_text[:-1]} Name: "
+                    item_name = self.get_string_input(prompt, list_y, start_x + 2, draw_loop_screen)
+                    if item_name.lower() == 'done': break
+                    
+                    val = None
+                    while val is None:
+                        start_y, start_x, list_y = draw_loop_screen()
+                        self.stdscr.addstr(list_y, start_x+2, f"{prompt}{item_name}") # Keep the name visible
+                        val = self.get_number_input("  Value: ", list_y + 1, start_x + 2, min_val, max_val, draw_loop_screen)
+                    
+                    entered_items[item_name] = val
+                    self.character.set_initial_trait(title_text.lower(), item_name, val)
+            else:
+                for item in item_list:
+                    val = None
+                    while val is None:
+                        start_y, start_x, list_y = draw_loop_screen()
+                        val = self.get_number_input(f"{item}: ", list_y, start_x + 2, min_val, max_val, draw_loop_screen)
+                    entered_items[item] = val
+                    self.character.set_initial_trait(title_text.lower(), item, val)
+            return entered_items
+
+        run_setup_loop("Attributes", ATTRIBUTES_LIST, 1, 10)
+        run_setup_loop("Abilities", ABILITIES_LIST, 0, 10)
+        run_setup_loop("Disciplines", [], 1, 10, is_freeform=True)
+        run_setup_loop("Backgrounds", [], 1, 10, is_freeform=True)
+        entered_virtues = run_setup_loop("Virtues", VIRTUES_LIST, 1, 10)
         
-        # Virtues
-        entered_virtues = {}
-        for virtue in VIRTUES_LIST:
+        def draw_final_values():
+            h, w = self.stdscr.getmaxyx()
             self.stdscr.clear()
             container_width, container_height = 60, 15
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-            self.draw_box(start_y, start_x, container_height, container_width, "Virtues & Path")
-            self.stdscr.addstr(start_y + 2, start_x + 2, "Set virtue values (1-10)", curses.color_pair(3))
-            list_y = start_y + 4
+            self.draw_box(start_y, start_x, container_height, container_width, "Final Values")
+            list_y = start_y + 2
             for name, value in entered_virtues.items():
                 self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1)); list_y += 1
-            val = self.get_number_input(f"{virtue}: ", list_y, start_x + 2, 1, 10)
-            entered_virtues[virtue] = val
-            self.character.set_initial_trait("virtues", virtue, val)
-        
-        # Humanity and Willpower
-        self.stdscr.clear()
-        container_width, container_height = 60, 15
-        start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-        self.draw_box(start_y, start_x, container_height, container_width, "Final Values")
-        list_y = start_y + 2
-        for name, value in entered_virtues.items():
-            self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1)); list_y += 1
-        humanity = self.get_number_input("Humanity/Path: ", list_y + 1, start_x + 2, 1, 10)
+            return start_y, start_x, list_y + 1
+
+        humanity = None
+        while humanity is None:
+            start_y, start_x, list_y = draw_final_values()
+            humanity = self.get_number_input("Humanity/Path: ", list_y, start_x + 2, 1, 10, draw_final_values)
         self.character.set_initial_value("humanity", humanity)
-        willpower = self.get_number_input("Willpower: ", list_y + 2, start_x + 2, 1, 10)
+
+        willpower = None
+        while willpower is None:
+            start_y, start_x, list_y = draw_final_values()
+            self.stdscr.addstr(list_y, start_x+2, f"Humanity/Path: {humanity}")
+            willpower = self.get_number_input("Willpower: ", list_y + 1, start_x + 2, 1, 10, draw_final_values)
         self.character.set_initial_value("willpower", willpower)
 
     def display_character_sheet(self, y: int, x: int, width: int, height: int):
@@ -442,7 +431,7 @@ class TUIApp:
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(display_list); self.message = ""
             elif key == ord('\n'):
                 if can_add and selected == len(trait_list):
-                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2)
+                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2, lambda: self.handle_improvement_menu(label, category))
                     if new_name and new_name.lower() != 'done':
                         self.character.set_initial_trait(category.lower() + 's', new_name, 0)
                         trait_list.append(new_name)
@@ -459,32 +448,49 @@ class TUIApp:
             self.show_popup("Trait at Maximum", f"{trait_name} is already at its maximum value of {max_val}.")
             return
         
-        h, w = self.stdscr.getmaxyx()
-        dialog_width, dialog_height = 50, 8
-        dialog_x, dialog_y = (w - dialog_width) // 2, (h - dialog_height) // 2
-        
-        self.draw_box(dialog_y, dialog_x, dialog_height, dialog_width, "Improve Trait")
-        self.stdscr.addstr(dialog_y + 2, dialog_x + 2, f"Trait: {trait_name}", curses.color_pair(3))
-        self.stdscr.addstr(dialog_y + 3, dialog_x + 2, f"Current: [{current}]", curses.color_pair(1))
-        self.stdscr.addstr(dialog_y + 4, dialog_x + 2, f"Max: {max_val}", curses.color_pair(3))
-        
-        target = self.get_number_input(f"New value ({current+1}-{max_val}): ", dialog_y + 5, dialog_x + 2, current + 1, max_val)
+        def draw_improve_screen():
+            h, w = self.stdscr.getmaxyx()
+            # Redraw the underlying improvement menu
+            self.handle_improvement_menu(category.capitalize() if category != "Humanity" else "Humanity/Path", category)
+            
+            dialog_width, dialog_height = 50, 8
+            dialog_x, dialog_y = (w - dialog_width) // 2, (h - dialog_height) // 2
+            self.draw_box(dialog_y, dialog_x, dialog_height, dialog_width, "Improve Trait")
+            self.stdscr.addstr(dialog_y + 2, dialog_x + 2, f"Trait: {trait_name}", curses.color_pair(3))
+            self.stdscr.addstr(dialog_y + 3, dialog_x + 2, f"Current: [{current}]", curses.color_pair(1))
+            self.stdscr.addstr(dialog_y + 4, dialog_x + 2, f"Max: {max_val}", curses.color_pair(3))
+            return dialog_y + 5, dialog_x + 2
+
+        target = None
+        while target is None:
+            prompt_y, prompt_x = draw_improve_screen()
+            target = self.get_number_input(f"New value ({current+1}-{max_val}): ", prompt_y, prompt_x, current + 1, max_val, draw_improve_screen)
         
         success, msg = self.character.improve_trait(category, trait_name, target)
         if success:
-            self.show_message(msg, 1) # Success is a toast
+            self.show_message(msg, 1)
         else:
-            self.show_popup("Error", msg, 2) # Failure is a pop-up
+            self.show_popup("Error", msg, 2)
 
     def run(self):
         """Main application orchestrator."""
         try:
-            self.setup_character()
-        except QuitApplication:
-            return
+            if not self.setup_character():
+                return
+            
+            # This is now the main interaction block
+            self.main_menu()
 
-        self.main_menu()
-        self.show_final_sheet()
+        except QuitApplication:
+            # If Ctrl+X is hit after setup is complete, land here!
+            # and fall through to the final sheet.
+            # If it's hit during setup, setup_character raises it and
+            # this top-level try/except in main() catches it for a clean exit.
+            pass
+        
+        # This is only reachable if the character object was created.
+        if self.character:
+            self.show_final_sheet()
 
     def show_final_sheet(self):
         """Display the final character sheet before exiting."""
