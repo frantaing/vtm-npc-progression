@@ -230,8 +230,6 @@ class TUIApp:
         run_setup_loop("Disciplines", [], 1, 10, is_freeform=True)
         run_setup_loop("Backgrounds", [], 1, 10, is_freeform=True)
 
-        # --- [FIXED] --- Unified Virtues, Humanity, and Willpower setup
-        
         entered_virtues: Dict[str, Any] = {}
         humanity: Optional[int] = None
         willpower: Optional[int] = None
@@ -239,7 +237,7 @@ class TUIApp:
         def draw_virtues_screen():
             h, w = self.stdscr.getmaxyx()
             self.stdscr.clear()
-            container_width, container_height = 60, 20  # Consistent height
+            container_width, container_height = 60, 20
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             self.draw_box(start_y, start_x, container_height, container_width, "Virtues & Path")
             self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial values (1-10)", curses.color_pair(3))
@@ -247,15 +245,12 @@ class TUIApp:
             list_y = start_y + 4
             for name, value in entered_virtues.items():
                 self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(1)); list_y += 1
-            
             if humanity is not None:
                 self.stdscr.addstr(list_y, start_x + 2, f"Humanity/Path: {humanity}", curses.color_pair(1)); list_y += 1
             if willpower is not None:
                 self.stdscr.addstr(list_y, start_x + 2, f"Willpower: {willpower}", curses.color_pair(1)); list_y += 1
-            
             return start_y, start_x, list_y
 
-        # Get Virtues
         for virtue in VIRTUES_LIST:
             val = None
             while val is None:
@@ -264,13 +259,11 @@ class TUIApp:
             entered_virtues[virtue] = val
             self.character.set_initial_trait("virtues", virtue, val)
         
-        # Get Humanity
         while humanity is None:
             start_y, start_x, list_y = draw_virtues_screen()
             humanity = self.get_number_input("Humanity/Path: ", list_y, start_x + 2, 1, 10, draw_virtues_screen)
         self.character.set_initial_value("humanity", humanity)
 
-        # Get Willpower
         while willpower is None:
             start_y, start_x, list_y = draw_virtues_screen()
             willpower = self.get_number_input("Willpower: ", list_y, start_x + 2, 1, 10, draw_virtues_screen)
@@ -326,6 +319,36 @@ class TUIApp:
         else:
             trait_str = f"{name_part} [{data['base']}]→[{data['new']}]"
             self.stdscr.addstr(y, x, trait_str[:width], curses.color_pair(1))
+            
+    def _draw_main_menu_screen(self, selected, menu_items):
+        h, w = self.stdscr.getmaxyx()
+        self.stdscr.clear()
+        container_width, container_height = min(110, w - 4), min(50, h - 6)
+        start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
+        self.draw_box(start_y, start_x, container_height, container_width, "VTM Elder Creator")
+        
+        right_panel_width, left_panel_width = 32, container_width - 32 - 5
+        panel_content_height = container_height - 6
+        self.display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
+        
+        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(4))
+        
+        right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
+        self.stdscr.addstr(menu_y, right_x, "SPEND FREEBIE POINTS", curses.color_pair(3) | curses.A_BOLD); menu_y += 2
+        
+        for i, (label, category) in enumerate(menu_items):
+            prefix = "► " if i == selected else "  "
+            menu_str = f"{prefix}{label} (Cost: {FREEBIE_COSTS.get(category, 'N/A')}/dot)"
+            self.stdscr.addstr(menu_y + i, right_x, menu_str[:right_panel_width], curses.A_REVERSE if i == selected else curses.A_NORMAL)
+        
+        if self.message:
+            msg_y = start_y + container_height - 2
+            wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
+            msg_start_y = msg_y - (len(wrapped_lines) - 1)
+            self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
+        
+        controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
+        self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(3))
 
     def main_menu(self):
         """Main menu loop. Returns when user presses Ctrl+X."""
@@ -337,34 +360,7 @@ class TUIApp:
         ]
         
         while True:
-            h, w = self.stdscr.getmaxyx()
-            self.stdscr.clear()
-            container_width, container_height = min(110, w - 4), min(50, h - 6)
-            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-            self.draw_box(start_y, start_x, container_height, container_width, "VTM Elder Creator")
-            
-            right_panel_width, left_panel_width = 32, container_width - 32 - 5
-            panel_content_height = container_height - 6
-            self.display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
-            
-            for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(4))
-            
-            right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
-            self.stdscr.addstr(menu_y, right_x, "SPEND FREEBIE POINTS", curses.color_pair(3) | curses.A_BOLD); menu_y += 2
-            
-            for i, (label, category) in enumerate(menu_items):
-                prefix = "► " if i == selected else "  "
-                menu_str = f"{prefix}{label} (Cost: {FREEBIE_COSTS.get(category, 'N/A')}/dot)"
-                self.stdscr.addstr(menu_y + i, right_x, menu_str[:right_panel_width], curses.A_REVERSE if i == selected else curses.A_NORMAL)
-            
-            if self.message:
-                msg_y = start_y + container_height - 2
-                wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
-                msg_start_y = msg_y - (len(wrapped_lines) - 1)
-                self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
-            
-            controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
-            self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(3))
+            self._draw_main_menu_screen(selected, menu_items)
             self.stdscr.refresh()
             
             key = self.stdscr.getch()
@@ -372,11 +368,48 @@ class TUIApp:
             elif key == curses.KEY_RESIZE: self.message = ""
             elif key == curses.KEY_UP: selected = (selected - 1 + len(menu_items)) % len(menu_items); self.message = ""
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(menu_items); self.message = ""
-            elif key == ord('\n'): self.handle_improvement_menu(menu_items[selected][0], menu_items[selected][1])
+            elif key == ord('\n'):
+                label, category = menu_items[selected]
+                self.handle_improvement_menu(label, category, selected, menu_items)
 
-    def handle_improvement_menu(self, label: str, category: str):
+    def _draw_improvement_menu_screen(self, label, category, trait_list, selected, scroll_offset, can_add):
+        h, w = self.stdscr.getmaxyx()
+        self.stdscr.clear()
+        container_width = min(110, w - 4); container_height = min(50, h - 6)
+        start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
+        right_panel_width, left_panel_width = 32, container_width - 32 - 5
+        panel_content_height = container_height - 6
+        self.draw_box(start_y, start_x, container_height, container_width, f"Improve {label}")
+        self.display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
+        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(4))
+        right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
+        self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies} points", curses.color_pair(1) | curses.A_BOLD); menu_y += 2
+        max_display_items = container_height - 12
+        display_list = trait_list + (["** Add New **"] if can_add else [])
+        for i in range(max_display_items):
+            idx = scroll_offset + i
+            if idx >= len(display_list): break
+            trait_name = display_list[idx]
+            prefix = "► " if idx == selected else "  "
+            if trait_name == "** Add New **": trait_str = f"{prefix}{trait_name}"
+            else:
+                current = self.character.get_trait_data(category, trait_name)['new']
+                trait_str = f"{prefix}{trait_name[:18]:<18} [{current}]"
+            self.stdscr.addstr(menu_y + i, right_x, trait_str[:right_panel_width], curses.A_REVERSE if idx == selected else curses.A_NORMAL)
+        if self.message:
+            msg_y = start_y + container_height - 2
+            wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
+            msg_start_y = msg_y - (len(wrapped_lines) - 1)
+            self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
+        self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", curses.color_pair(3))
+        return start_x, start_y, container_height
+
+    def handle_improvement_menu(self, label: str, category: str, main_menu_selected: int, main_menu_items: list):
         if category in ["Humanity", "Willpower"]:
-            self.improve_single_trait(label, category, "Humanity/Path" if category == "Humanity" else "Willpower"); return
+            redraw_func = self._draw_main_menu_screen
+            redraw_args = (main_menu_selected, main_menu_items)
+            self.improve_single_trait(label, category, "Humanity/Path" if category == "Humanity" else "Willpower", redraw_func, *redraw_args)
+            return
         
         trait_list_map = { "Attribute": ATTRIBUTES_LIST, "Ability": ABILITIES_LIST, "Discipline": list(self.character.disciplines.keys()), "Background": list(self.character.backgrounds.keys()), "Virtue": VIRTUES_LIST }
         trait_list = trait_list_map.get(category, [])
@@ -384,60 +417,38 @@ class TUIApp:
         can_add = category in ["Discipline", "Background"]
 
         while True:
-            h, w = self.stdscr.getmaxyx()
-            self.stdscr.clear()
-            container_width = min(110, w - 4); container_height = min(50, h - 6)
-            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-            right_panel_width, left_panel_width = 32, container_width - 32 - 5
-            panel_content_height = container_height - 6
-            self.draw_box(start_y, start_x, container_height, container_width, f"Improve {label}")
-            self.display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
-            for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(4))
-            right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
-            self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies} points", curses.color_pair(1) | curses.A_BOLD); menu_y += 2
-            max_display_items = container_height - 12
-            if selected < scroll_offset: scroll_offset = selected
-            if selected >= scroll_offset + max_display_items: scroll_offset = selected - max_display_items + 1
             display_list = trait_list + (["** Add New **"] if can_add else [])
-            for i in range(max_display_items):
-                idx = scroll_offset + i
-                if idx >= len(display_list): break
-                trait_name = display_list[idx]
-                prefix = "► " if idx == selected else "  "
-                if trait_name == "** Add New **": trait_str = f"{prefix}{trait_name}"
-                else:
-                    current = self.character.get_trait_data(category, trait_name)['new']
-                    trait_str = f"{prefix}{trait_name[:18]:<18} [{current}]"
-                self.stdscr.addstr(menu_y + i, right_x, trait_str[:right_panel_width], curses.A_REVERSE if idx == selected else curses.A_NORMAL)
-            if self.message:
-                msg_y = start_y + container_height - 2
-                wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
-                msg_start_y = msg_y - (len(wrapped_lines) - 1)
-                self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
-            self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", curses.color_pair(3))
+            if selected < scroll_offset: scroll_offset = selected
+            if selected >= scroll_offset + (container_height := min(50, self.stdscr.getmaxyx()[0] - 6)) - 12: scroll_offset = selected - (container_height - 12) + 1
+
+            start_x, start_y, container_height = self._draw_improvement_menu_screen(label, category, trait_list, selected, scroll_offset, can_add)
             self.stdscr.refresh()
+            
             key = self.stdscr.getch()
             if key == 24: raise QuitApplication()
+            elif key == 27: self.message = ""; return
             elif key == curses.KEY_RESIZE: self.message = ""
             elif key == curses.KEY_UP: selected = (selected - 1 + len(display_list)) % len(display_list); self.message = ""
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(display_list); self.message = ""
             elif key == ord('\n'):
                 if can_add and selected == len(trait_list):
-                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2, self.main_menu)
+                    redraw_args = (label, category, trait_list, selected, scroll_offset, can_add)
+                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2, self._draw_improvement_menu_screen, *redraw_args)
                     if new_name and new_name.lower() != 'done':
                         self.character.set_initial_trait(category.lower() + 's', new_name, 0)
                         trait_list.append(new_name)
-                        self.improve_single_trait(label, category, new_name)
-                elif selected < len(trait_list): self.improve_single_trait(label, category, trait_list[selected])
-            elif key == 27: self.message = ""; return
-
-    def improve_single_trait(self, parent_label: str, category: str, trait_name: str):
+                        self.improve_single_trait(label, category, new_name, self._draw_improvement_menu_screen, *redraw_args)
+                elif selected < len(trait_list):
+                    redraw_args = (label, category, trait_list, selected, scroll_offset, can_add)
+                    self.improve_single_trait(label, category, trait_list[selected], self._draw_improvement_menu_screen, *redraw_args)
+            
+    def improve_single_trait(self, parent_label: str, category: str, trait_name: str, parent_draw_func, *redraw_args):
         trait_data = self.character.get_trait_data(category, trait_name)
         current, max_val = trait_data['new'], self.character.max_trait_rating
         if current >= max_val: self.show_popup("Trait at Maximum", f"{trait_name} is already at its maximum value of {max_val}."); return
         
-        def draw_improve_screen(label=parent_label, cat=category):
-            self.handle_improvement_menu(label, cat)
+        def draw_improve_dialog():
+            parent_draw_func(*redraw_args)
             h, w = self.stdscr.getmaxyx()
             dialog_width, dialog_height = 50, 8
             dialog_x, dialog_y = (w - dialog_width) // 2, (h - dialog_height) // 2
@@ -449,8 +460,8 @@ class TUIApp:
 
         target = None
         while target is None:
-            prompt_y, prompt_x = draw_improve_screen()
-            target = self.get_number_input(f"New value ({current+1}-{max_val}): ", prompt_y, prompt_x, current + 1, max_val, draw_improve_screen)
+            prompt_y, prompt_x = draw_improve_dialog()
+            target = self.get_number_input(f"New value ({current+1}-{max_val}): ", prompt_y, prompt_x, current + 1, max_val, draw_improve_dialog)
         
         success, msg = self.character.improve_trait(category, trait_name, target)
         if success: self.show_message(msg, 1)
@@ -459,8 +470,7 @@ class TUIApp:
     def run(self):
         """Main application orchestrator."""
         try:
-            if not self.setup_character():
-                return
+            if not self.setup_character(): return
             self.main_menu()
         except QuitApplication:
             pass
@@ -472,8 +482,7 @@ class TUIApp:
         while True:
             self.stdscr.clear()
             h, w = self.stdscr.getmaxyx()
-            container_width = min(110, w - 4)
-            container_height = min(55, h - 6)
+            container_width = min(110, w - 4); container_height = min(55, h - 6)
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             
             self.draw_box(start_y, start_x, container_height, container_width, "FINAL CHARACTER SHEET")
@@ -488,7 +497,7 @@ class TUIApp:
             
             start_draw_y, max_draw_y = sheet_y, start_y + container_height - 3
             col1_x, col_width = sheet_x, 28
-            col2_x = sheet_x + col_width + 2
+            col2_x = sheet_x + col_width + 4
 
             y_left = start_draw_y
             self.stdscr.addstr(y_left, col1_x, "═══ ATTRIBUTES ═══", curses.color_pair(4) | curses.A_BOLD); y_left += 1
