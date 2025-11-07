@@ -370,7 +370,7 @@ class TUIApp:
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(menu_items); self.message = ""
             elif key == ord('\n'):
                 label, category = menu_items[selected]
-                self.handle_improvement_menu(label, category, selected, menu_items)
+                self.handle_improvement_menu(label, category)
 
     def _draw_improvement_menu_screen(self, label, category, trait_list, selected, scroll_offset, can_add):
         h, w = self.stdscr.getmaxyx()
@@ -402,13 +402,11 @@ class TUIApp:
             msg_start_y = msg_y - (len(wrapped_lines) - 1)
             self.draw_wrapped_text(msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
         self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", curses.color_pair(3))
-        return start_x, start_y, container_height
+        return start_x, start_y, container_height, right_x
 
-    def handle_improvement_menu(self, label: str, category: str, main_menu_selected: int, main_menu_items: list):
+    def handle_improvement_menu(self, label: str, category: str):
         if category in ["Humanity", "Willpower"]:
-            redraw_func = self._draw_main_menu_screen
-            redraw_args = (main_menu_selected, main_menu_items)
-            self.improve_single_trait(label, category, "Humanity/Path" if category == "Humanity" else "Willpower", redraw_func, *redraw_args)
+            self.improve_single_trait(label, category, "Humanity/Path" if category == "Humanity" else "Willpower", self._draw_main_menu_screen, 0, []) # Dummy args
             return
         
         trait_list_map = { "Attribute": ATTRIBUTES_LIST, "Ability": ABILITIES_LIST, "Discipline": list(self.character.disciplines.keys()), "Background": list(self.character.backgrounds.keys()), "Virtue": VIRTUES_LIST }
@@ -418,10 +416,12 @@ class TUIApp:
 
         while True:
             display_list = trait_list + (["** Add New **"] if can_add else [])
+            container_height = min(50, self.stdscr.getmaxyx()[0] - 6)
+            max_items = container_height - 12
             if selected < scroll_offset: scroll_offset = selected
-            if selected >= scroll_offset + (container_height := min(50, self.stdscr.getmaxyx()[0] - 6)) - 12: scroll_offset = selected - (container_height - 12) + 1
+            if selected >= scroll_offset + max_items: scroll_offset = selected - max_items + 1
 
-            start_x, start_y, container_height = self._draw_improvement_menu_screen(label, category, trait_list, selected, scroll_offset, can_add)
+            start_x, start_y, container_height, right_x = self._draw_improvement_menu_screen(label, category, trait_list, selected, scroll_offset, can_add)
             self.stdscr.refresh()
             
             key = self.stdscr.getch()
@@ -431,15 +431,15 @@ class TUIApp:
             elif key == curses.KEY_UP: selected = (selected - 1 + len(display_list)) % len(display_list); self.message = ""
             elif key == curses.KEY_DOWN: selected = (selected + 1) % len(display_list); self.message = ""
             elif key == ord('\n'):
+                redraw_args = (label, category, trait_list, selected, scroll_offset, can_add)
                 if can_add and selected == len(trait_list):
-                    redraw_args = (label, category, trait_list, selected, scroll_offset, can_add)
-                    new_name = self.get_string_input("New name: ", start_y + container_height - 3, start_x + 2, self._draw_improvement_menu_screen, *redraw_args)
+                    prompt_y = start_y + container_height - 4
+                    new_name = self.get_string_input(f"New {category[:-1]} Name: ", prompt_y, right_x, self._draw_improvement_menu_screen, *redraw_args)
                     if new_name and new_name.lower() != 'done':
                         self.character.set_initial_trait(category.lower() + 's', new_name, 0)
                         trait_list.append(new_name)
                         self.improve_single_trait(label, category, new_name, self._draw_improvement_menu_screen, *redraw_args)
                 elif selected < len(trait_list):
-                    redraw_args = (label, category, trait_list, selected, scroll_offset, can_add)
                     self.improve_single_trait(label, category, trait_list[selected], self._draw_improvement_menu_screen, *redraw_args)
             
     def improve_single_trait(self, parent_label: str, category: str, trait_name: str, parent_draw_func, *redraw_args):
