@@ -74,8 +74,6 @@ class SetupView:
         return character
 
     def _setup_initial_traits(self, character: VtMCharacter):
-        # ... The rest of this file is identical to the previous version ...
-        # (I am pasting it here for completeness)
         
         def run_setup_loop(title_text, item_list, min_val, max_val, is_freeform=False):
             entered_items: Dict[str, Any] = {}

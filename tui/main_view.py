@@ -14,7 +14,6 @@ class MainView:
         self.message_color = utils.COLOR_GREEN
 
     def run(self):
-        # ... (This method is unchanged)
         selected = 0
         menu_items = [
             ("Attributes", "Attribute"), ("Abilities", "Ability"), ("Disciplines", "Discipline"),
@@ -39,7 +38,6 @@ class MainView:
         self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], curses.color_pair(utils.COLOR_MAGENTA) | curses.A_BOLD); y += 1
         self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], curses.color_pair(utils.COLOR_YELLOW)); y += 1
         
-        # --- [MODIFIED] ---
         if self.character.is_free_mode:
             freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
             color = curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD
@@ -48,7 +46,6 @@ class MainView:
             freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
             color = (curses.color_pair(utils.COLOR_GREEN) if remaining > 0 else curses.color_pair(utils.COLOR_RED)) | curses.A_BOLD
         self.stdscr.addstr(y, x, freebie_str, color); y += 2
-        # --- [END MODIFIED] ---
 
         start_y, max_y = y, y + height
         col1_x, col_width = x, 28
@@ -85,8 +82,6 @@ class MainView:
             if y_right <= max_y: self._display_trait(y_right, col2_x, "Humanity", self.character.humanity, col_width); y_right += 1
             if y_right <= max_y: self._display_trait(y_right, col2_x, "Willpower", self.character.willpower, col_width)
 
-    # All other methods from the previous version of main_view.py remain the same
-    # I am pasting them here for completeness...
     def _draw_main_menu_screen(self, selected, menu_items):
         h, w = self.stdscr.getmaxyx()
         self.stdscr.clear()
