@@ -8,6 +8,7 @@ user interface.
 """
 
 # --- [IMPORTS] ---
+import sys
 from typing import Dict, List, Tuple
 
 # --- [DATA] ---
@@ -51,11 +52,12 @@ VIRTUES_LIST: List[str] = ["Conscience", "Self-Control", "Courage"]
 class VtMCharacter:
     """Stores and manages a VtM character's progression."""
 
-    def __init__(self, name: str, clan: str, age: int, generation: int):
+    def __init__(self, name: str, clan: str, age: int, generation: int, is_free_mode: bool = False):
         self.name = name
         self.clan = clan
         self.age = age
         self.generation = generation
+        self.is_free_mode = is_free_mode
 
         self.attributes: Dict[str, Dict[str, int]] = {}
         self.abilities: Dict[str, Dict[str, int]] = {}
@@ -66,7 +68,12 @@ class VtMCharacter:
         self.willpower: Dict[str, int] = {"base": 0, "new": 0}
 
         self.max_trait_rating = GENERATION_DATA.get(generation, {}).get("max_trait", 5)
-        self.total_freebies = self._calculate_total_freebies()
+        
+        if self.is_free_mode:
+            self.total_freebies = sys.maxsize
+        else:
+            self.total_freebies = self._calculate_total_freebies()
+            
         self.spent_freebies = 0
 
     def _calculate_total_freebies(self) -> int:
@@ -117,9 +124,11 @@ class VtMCharacter:
         dots_to_add = target_value - current_rating
         total_cost = dots_to_add * cost_per_dot
 
-        if remaining_points < total_cost:
+        if not self.is_free_mode and remaining_points < total_cost:
             return False, f"Not enough points! Cost: {total_cost}, Available: {remaining_points}"
 
         trait_data["new"] = target_value
-        self.spent_freebies += total_cost
+        if not self.is_free_mode:
+            self.spent_freebies += total_cost
+        
         return True, f"'{trait_name}' raised to {target_value}. Cost: {total_cost} points"

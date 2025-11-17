@@ -9,16 +9,16 @@ class SetupView:
     def __init__(self, stdscr):
         self.stdscr = stdscr
 
-    def run(self) -> Optional[VtMCharacter]:
+    def run(self, is_free_mode: bool) -> Optional[VtMCharacter]:
         """Orchestrates the entire character setup process."""
-        character = self._setup_character()
+        character = self._setup_character(is_free_mode)
         if not character:
             return None
         
         self._setup_initial_traits(character)
         return character
 
-    def _setup_character(self) -> Optional[VtMCharacter]:
+    def _setup_character(self, is_free_mode: bool) -> Optional[VtMCharacter]:
         """Handles the first screen for basic character info."""
         prompts = [
             ("Character Name", None, None), ("Clan", None, None),
@@ -49,7 +49,11 @@ class SetupView:
                     value = utils.get_string_input(self.stdscr, f"{label}: ", list_y, start_x + 2, draw_setup_screen)
             entered_info[label] = value
         
-        character = VtMCharacter(entered_info["Character Name"], entered_info["Clan"], entered_info["Age (0-5600+)"], entered_info["Generation (2-16)"])
+        character = VtMCharacter(
+            entered_info["Character Name"], entered_info["Clan"], 
+            entered_info["Age (0-5600+)"], entered_info["Generation (2-16)"],
+            is_free_mode=is_free_mode
+        )
         
         h, w = self.stdscr.getmaxyx()
         container_width, container_height = 70, 18
@@ -59,7 +63,10 @@ class SetupView:
         list_y = start_y + 2
         for info_label, info_value in entered_info.items():
             self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", curses.color_pair(utils.COLOR_GREEN)); list_y += 1
-        self.stdscr.addstr(list_y + 1, start_x + 2, f"Character created with {character.total_freebies} Freebie Points!", curses.color_pair(utils.COLOR_GREEN) | curses.A_BOLD)
+        
+        freebie_msg = "Freebie Points: Unlimited" if is_free_mode else f"Character created with {character.total_freebies} Freebie Points!"
+        self.stdscr.addstr(list_y + 1, start_x + 2, freebie_msg, curses.color_pair(utils.COLOR_GREEN) | curses.A_BOLD)
+        
         self.stdscr.addstr(list_y + 3, start_x + 2, "Press any key to set initial traits...", curses.color_pair(utils.COLOR_YELLOW))
         self.stdscr.refresh()
         if self.stdscr.getch() == 24: raise utils.QuitApplication()
@@ -67,7 +74,8 @@ class SetupView:
         return character
 
     def _setup_initial_traits(self, character: VtMCharacter):
-        """Handles all subsequent screens for setting trait values."""
+        # ... The rest of this file is identical to the previous version ...
+        # (I am pasting it here for completeness)
         
         def run_setup_loop(title_text, item_list, min_val, max_val, is_freeform=False):
             entered_items: Dict[str, Any] = {}
@@ -115,7 +123,6 @@ class SetupView:
         run_setup_loop("Disciplines", [], 1, 10, is_freeform=True)
         run_setup_loop("Backgrounds", [], 1, 10, is_freeform=True)
         
-        # Unified Virtues/Path section
         entered_virtues: Dict[str, Any] = {}
         humanity: Optional[int] = None
         willpower: Optional[int] = None
