@@ -14,7 +14,7 @@ class MainView:
         self.message_color = utils.COLOR_GREEN
 
     def run(self):
-        """Main menu loop. Returns when user presses Ctrl+X."""
+        # ... (This method is unchanged)
         selected = 0
         menu_items = [
             ("Attributes", "Attribute"), ("Abilities", "Ability"), ("Disciplines", "Discipline"),
@@ -41,7 +41,7 @@ class MainView:
         
         # --- [MODIFIED] ---
         if self.character.is_free_mode:
-            freebie_str = "Freebie Points: Unlimited"
+            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
             color = curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD
         else:
             remaining = self.character.total_freebies - self.character.spent_freebies
@@ -166,7 +166,13 @@ class MainView:
         self._display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
         for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(utils.COLOR_CYAN))
         right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
-        self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies}", curses.color_pair(utils.COLOR_GREEN) | curses.A_BOLD); menu_y += 2
+        
+        # Count freebie points spent in Free Mode
+        if self.character.is_free_mode:
+            self.stdscr.addstr(menu_y, right_x, f"Total Cost: {self.character.spent_freebies}", curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD); menu_y += 2
+        else:
+            self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies}", curses.color_pair(utils.COLOR_GREEN) | curses.A_BOLD); menu_y += 2
+
         max_display_items = container_height - 12
         display_list = trait_list + (["** Add New **"] if can_add else [])
         for i in range(max_display_items):

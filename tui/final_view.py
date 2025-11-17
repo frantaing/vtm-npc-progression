@@ -24,16 +24,15 @@ class FinalView:
             self.stdscr.addstr(sheet_y, sheet_x, f"{self.character.name} ({self.character.clan})", curses.color_pair(utils.COLOR_MAGENTA) | curses.A_BOLD); sheet_y += 1
             self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", curses.color_pair(utils.COLOR_YELLOW)); sheet_y += 1
             
-            # --- [MODIFIED] ---
+            # Count freebie points spent in Free Mode
             if self.character.is_free_mode:
-                spent_str = "Freebie Points: Unlimited"
+                spent_str = f"Total Freebie Points Spent: {self.character.spent_freebies}"
                 color = curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD
             else:
                 remaining = self.character.total_freebies - self.character.spent_freebies
                 spent_str = f"Freebie Points: {self.character.spent_freebies}/{self.character.total_freebies} spent" + (f" ({remaining} remaining)" if remaining > 0 else "")
                 color = (curses.color_pair(utils.COLOR_GREEN) if remaining == 0 else curses.color_pair(utils.COLOR_YELLOW)) | curses.A_BOLD
             self.stdscr.addstr(sheet_y, sheet_x, spent_str, color); sheet_y += 2
-            # --- [END MODIFIED] ---
             
             start_draw_y, max_draw_y = sheet_y, start_y + container_height - 3
             col1_x, col_width = sheet_x, 28

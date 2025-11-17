@@ -69,11 +69,7 @@ class VtMCharacter:
 
         self.max_trait_rating = GENERATION_DATA.get(generation, {}).get("max_trait", 5)
         
-        if self.is_free_mode:
-            self.total_freebies = sys.maxsize
-        else:
-            self.total_freebies = self._calculate_total_freebies()
-            
+        self.total_freebies = sys.maxsize if self.is_free_mode else self._calculate_total_freebies()
         self.spent_freebies = 0
 
     def _calculate_total_freebies(self) -> int:
@@ -128,7 +124,8 @@ class VtMCharacter:
             return False, f"Not enough points! Cost: {total_cost}, Available: {remaining_points}"
 
         trait_data["new"] = target_value
-        if not self.is_free_mode:
-            self.spent_freebies += total_cost
+        
+        # Always track spent points
+        self.spent_freebies += total_cost
         
         return True, f"'{trait_name}' raised to {target_value}. Cost: {total_cost} points"
