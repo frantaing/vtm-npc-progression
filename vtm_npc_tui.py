@@ -12,6 +12,7 @@ import curses
 import sys
 import traceback
 from tui.utils import QuitApplication
+from tui.greeting_view import GreetingView
 from tui.setup_view import SetupView
 from tui.main_view import MainView
 from tui.final_view import FinalView
@@ -36,22 +37,26 @@ class TUIApp:
 
     def run(self):
         """Main application orchestrator."""
+        is_free_mode = False
         try:
-            # 1: Setup
-            setup_view = SetupView(self.stdscr)
-            self.character = setup_view.run()
-            if not self.character:
-                return # User quit during initial setup
+            # Phase 0: Greeting
+            greeting_view = GreetingView(self.stdscr)
+            is_free_mode = greeting_view.run()
 
-            # 2: Main Interaction
+            # Phase 1: Setup
+            setup_view = SetupView(self.stdscr)
+            self.character = setup_view.run(is_free_mode=is_free_mode)
+            if not self.character:
+                return 
+
+            # Phase 2: Main Interaction
             main_view = MainView(self.stdscr, self.character)
             main_view.run()
 
         except QuitApplication:
-            # This will catch Ctrl+X from any view after setup is complete
             pass
         
-        # 3: Final Display (only if a character was created)
+        # Phase 3: Final Display
         if self.character:
             final_view = FinalView(self.stdscr, self.character)
             final_view.show()
@@ -67,7 +72,6 @@ if __name__ == "__main__":
     try:
         curses.wrapper(main)
     except QuitApplication:
-        # This catches Ctrl+X only if it's raised during the initial setup
         print("\nExiting program. Goodbye!")
     except KeyboardInterrupt:
         print("\nExiting program. Goodbye!")

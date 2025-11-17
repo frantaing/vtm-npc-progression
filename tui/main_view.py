@@ -14,7 +14,6 @@ class MainView:
         self.message_color = utils.COLOR_GREEN
 
     def run(self):
-        """Main menu loop. Returns when user presses Ctrl+X."""
         selected = 0
         menu_items = [
             ("Attributes", "Attribute"), ("Abilities", "Ability"), ("Disciplines", "Discipline"),
@@ -34,6 +33,54 @@ class MainView:
             elif key == ord('\n'):
                 label, category = menu_items[selected]
                 self._handle_improvement_menu(label, category)
+
+    def _display_character_sheet(self, y: int, x: int, width: int, height: int):
+        self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], curses.color_pair(utils.COLOR_MAGENTA) | curses.A_BOLD); y += 1
+        self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], curses.color_pair(utils.COLOR_YELLOW)); y += 1
+        
+        if self.character.is_free_mode:
+            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
+            color = curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD
+        else:
+            remaining = self.character.total_freebies - self.character.spent_freebies
+            freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
+            color = (curses.color_pair(utils.COLOR_GREEN) if remaining > 0 else curses.color_pair(utils.COLOR_RED)) | curses.A_BOLD
+        self.stdscr.addstr(y, x, freebie_str, color); y += 2
+
+        start_y, max_y = y, y + height
+        col1_x, col_width = x, 28
+        col2_x = x + col_width + 2
+
+        y_left = start_y
+        self.stdscr.addstr(y_left, col1_x, "═══ ATTRIBUTES ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_left += 1
+        for name, data in self.character.attributes.items():
+            if y_left > max_y: break
+            self._display_trait(y_left, col1_x, name, data, col_width); y_left += 1
+        y_left += 1
+        if y_left <= max_y:
+            self.stdscr.addstr(y_left, col1_x, "═══ ABILITIES ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_left += 1
+            abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
+            for name, data in abilities_shown:
+                if y_left > max_y: break
+                self._display_trait(y_left, col1_x, name, data, col_width); y_left += 1
+
+        y_right = start_y
+        for cat_name in ["disciplines", "backgrounds"]:
+            category = getattr(self.character, cat_name)
+            if category and y_right <= max_y:
+                self.stdscr.addstr(y_right, col2_x, f"═══ {cat_name.upper()} ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_right += 1
+                for name, data in category.items():
+                    if y_right > max_y: break
+                    self._display_trait(y_right, col2_x, name, data, col_width); y_right += 1
+                y_right += 1
+        
+        if y_right <= max_y:
+            self.stdscr.addstr(y_right, col2_x, "═══ VIRTUES & PATH ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_right += 1
+            for name, data in self.character.virtues.items():
+                if y_right > max_y: break
+                self._display_trait(y_right, col2_x, name, data, col_width); y_right += 1
+            if y_right <= max_y: self._display_trait(y_right, col2_x, "Humanity", self.character.humanity, col_width); y_right += 1
+            if y_right <= max_y: self._display_trait(y_right, col2_x, "Willpower", self.character.willpower, col_width)
 
     def _draw_main_menu_screen(self, selected, menu_items):
         h, w = self.stdscr.getmaxyx()
@@ -114,7 +161,13 @@ class MainView:
         self._display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
         for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(utils.COLOR_CYAN))
         right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
-        self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies} points", curses.color_pair(utils.COLOR_GREEN) | curses.A_BOLD); menu_y += 2
+        
+        # Count freebie points spent in Free Mode
+        if self.character.is_free_mode:
+            self.stdscr.addstr(menu_y, right_x, f"Total Cost: {self.character.spent_freebies}", curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD); menu_y += 2
+        else:
+            self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies}", curses.color_pair(utils.COLOR_GREEN) | curses.A_BOLD); menu_y += 2
+
         max_display_items = container_height - 12
         display_list = trait_list + (["** Add New **"] if can_add else [])
         for i in range(max_display_items):
@@ -159,47 +212,6 @@ class MainView:
         success, msg = self.character.improve_trait(category, trait_name, target)
         if success: self.message, self.message_color = msg, utils.COLOR_GREEN
         else: utils.show_popup(self.stdscr, "Error", msg, utils.COLOR_RED)
-
-    def _display_character_sheet(self, y: int, x: int, width: int, height: int):
-        self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], curses.color_pair(utils.COLOR_MAGENTA) | curses.A_BOLD); y += 1
-        self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], curses.color_pair(utils.COLOR_YELLOW)); y += 1
-        remaining = self.character.total_freebies - self.character.spent_freebies
-        self.stdscr.addstr(y, x, f"Freebie: {remaining}/{self.character.total_freebies}", (curses.color_pair(utils.COLOR_GREEN) if remaining > 0 else curses.color_pair(utils.COLOR_RED)) | curses.A_BOLD); y += 2
-
-        start_y, max_y = y, y + height
-        col1_x, col_width = x, 28
-        col2_x = x + col_width + 2
-
-        y_left = start_y
-        self.stdscr.addstr(y_left, col1_x, "═══ ATTRIBUTES ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_left += 1
-        for name, data in self.character.attributes.items():
-            if y_left > max_y: break
-            self._display_trait(y_left, col1_x, name, data, col_width); y_left += 1
-        y_left += 1
-        if y_left <= max_y:
-            self.stdscr.addstr(y_left, col1_x, "═══ ABILITIES ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_left += 1
-            abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
-            for name, data in abilities_shown:
-                if y_left > max_y: break
-                self._display_trait(y_left, col1_x, name, data, col_width); y_left += 1
-
-        y_right = start_y
-        for cat_name in ["disciplines", "backgrounds"]:
-            category = getattr(self.character, cat_name)
-            if category and y_right <= max_y:
-                self.stdscr.addstr(y_right, col2_x, f"═══ {cat_name.upper()} ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_right += 1
-                for name, data in category.items():
-                    if y_right > max_y: break
-                    self._display_trait(y_right, col2_x, name, data, col_width); y_right += 1
-                y_right += 1
-        
-        if y_right <= max_y:
-            self.stdscr.addstr(y_right, col2_x, "═══ VIRTUES & PATH ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_right += 1
-            for name, data in self.character.virtues.items():
-                if y_right > max_y: break
-                self._display_trait(y_right, col2_x, name, data, col_width); y_right += 1
-            if y_right <= max_y: self._display_trait(y_right, col2_x, "Humanity", self.character.humanity, col_width); y_right += 1
-            if y_right <= max_y: self._display_trait(y_right, col2_x, "Willpower", self.character.willpower, col_width)
 
     def _display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
         max_name_len = width - 9
