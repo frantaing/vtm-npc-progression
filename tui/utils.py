@@ -2,37 +2,39 @@
 
 import curses
 import textwrap
-
-# --- [UI CONSTANTS] ---
-COLOR_GREEN = 1
-COLOR_RED = 2
-COLOR_YELLOW = 3
-COLOR_CYAN = 4
-COLOR_MAGENTA = 5
+from . import theme
 
 # --- [DRAWING HELPERS] ---
-
 def draw_box(stdscr, y, x, height, width, title=""):
-    """Draw a box with optional title."""
-    stdscr.attron(curses.color_pair(COLOR_CYAN))
+    """Draw a box with optional title using theme symbols."""
+    stdscr.attron(theme.CLR_BORDER())
     for i in range(height):
-        if i == 0: stdscr.addstr(y + i, x, "┌" + "─" * (width - 2) + "┐")
-        elif i == height - 1: stdscr.addstr(y + i, x, "└" + "─" * (width - 2) + "┘")
-        else: stdscr.addstr(y + i, x, "│" + " " * (width - 2) + "│")
+        if i == 0:
+            stdscr.addstr(y + i, x, theme.SYM_CORNER_TL + theme.SYM_BORDER_H * (width - 2) + theme.SYM_CORNER_TR)
+        elif i == height - 1:
+            stdscr.addstr(y + i, x, theme.SYM_CORNER_BL + theme.SYM_BORDER_H * (width - 2) + theme.SYM_CORNER_BR)
+        else:
+            stdscr.addstr(y + i, x, theme.SYM_BORDER_V + " " * (width - 2) + theme.SYM_BORDER_V)
+    stdscr.attroff(theme.CLR_BORDER())
     
     if title:
-        stdscr.addstr(y, x + 2, f" {title} ", curses.color_pair(COLOR_YELLOW) | curses.A_BOLD)
-    stdscr.attroff(curses.color_pair(COLOR_CYAN))
+        # Titles appear in Bold Red
+        stdscr.addstr(y, x + 2, f" {title} ", theme.CLR_ACCENT())
 
-def draw_wrapped_text(stdscr, y, x, text, width, color_pair_num=1):
-    """Draws text that wraps within a given width at a specified position."""
-    color = curses.color_pair(color_pair_num)
+def draw_wrapped_text(stdscr, y, x, text, width, color_attr=None):
+    """Draws text that wraps within a given width."""
+    if color_attr is None:
+        color_attr = theme.CLR_TEXT()
+        
     wrapped_lines = textwrap.wrap(text, width)
     for i, line in enumerate(wrapped_lines):
-        stdscr.addstr(y + i, x, line, color)
+        stdscr.addstr(y + i, x, line, color_attr)
 
-def show_popup(stdscr, title: str, message: str, color: int = COLOR_RED):
-    """Displays a modal pop-up and waits for a key press to dismiss."""
+def show_popup(stdscr, title: str, message: str, color_attr=None):
+    """Displays a modal pop-up."""
+    if color_attr is None:
+        color_attr = theme.CLR_ERROR()
+
     h, w = stdscr.getmaxyx()
     
     wrapped_lines = textwrap.wrap(message, 40)
@@ -45,18 +47,16 @@ def show_popup(stdscr, title: str, message: str, color: int = COLOR_RED):
     draw_box(stdscr, dialog_y, dialog_x, dialog_height, dialog_width, title)
     
     for i, line in enumerate(wrapped_lines):
-        stdscr.addstr(dialog_y + 2 + i, dialog_x + 2, line, curses.color_pair(color))
+        stdscr.addstr(dialog_y + 2 + i, dialog_x + 2, line, color_attr)
 
     dismiss_msg = "Press any key to continue..."
-    stdscr.addstr(dialog_y + dialog_height - 2, dialog_x + (dialog_width - len(dismiss_msg)) // 2, dismiss_msg, curses.color_pair(COLOR_YELLOW))
+    stdscr.addstr(dialog_y + dialog_height - 2, dialog_x + (dialog_width - len(dismiss_msg)) // 2, dismiss_msg, theme.CLR_TEXT())
     
     stdscr.refresh()
     stdscr.getch()
 
 # --- [INPUT HELPERS] ---
-
 class QuitApplication(Exception):
-    """Custom exception to signal a clean, immediate exit from the app."""
     pass
 
 def get_string_input(stdscr, prompt: str, y: int, x: int, current_screen_func, *args, **kwargs) -> str:
@@ -66,9 +66,9 @@ def get_string_input(stdscr, prompt: str, y: int, x: int, current_screen_func, *
 
     while True:
         current_screen_func(*args, **kwargs)
-        stdscr.addstr(y, x, prompt, curses.color_pair(COLOR_YELLOW))
+        stdscr.addstr(y, x, prompt, theme.CLR_ACCENT()) # Prompts are Red
         stdscr.addstr(y, input_x_start, " " * 30)
-        stdscr.addstr(y, input_x_start, input_str)
+        stdscr.addstr(y, input_x_start, input_str, theme.CLR_TEXT()) # Input is White
         stdscr.move(y, input_x_start + len(input_str))
         stdscr.refresh()
 

@@ -3,6 +3,7 @@
 import curses
 from typing import Dict, Any, Optional
 from . import utils
+from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
 
 class SetupView:
@@ -10,7 +11,6 @@ class SetupView:
         self.stdscr = stdscr
 
     def run(self, is_free_mode: bool) -> Optional[VtMCharacter]:
-        """Orchestrates the entire character setup process."""
         character = self._setup_character(is_free_mode)
         if not character:
             return None
@@ -19,7 +19,6 @@ class SetupView:
         return character
 
     def _setup_character(self, is_free_mode: bool) -> Optional[VtMCharacter]:
-        """Handles the first screen for basic character info."""
         prompts = [
             ("Character Name", None, None), ("Clan", None, None),
             ("Age (0-5600+)", 0, 10000), ("Generation (2-16)", 2, 16)
@@ -28,15 +27,15 @@ class SetupView:
 
         def draw_setup_screen():
             h, w = self.stdscr.getmaxyx()
-            self.stdscr.clear()
+            self.stdscr.erase() # Changed from clear() to erase() to reduce flicker
             container_width, container_height = 70, 18
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             title = "VAMPIRE: THE MASQUERADE - NPC PROGRESSION TOOL"
-            self.stdscr.addstr(start_y - 3, (w - len(title)) // 2, title, curses.color_pair(utils.COLOR_MAGENTA) | curses.A_BOLD)
+            self.stdscr.addstr(start_y - 3, (w - len(title)) // 2, title, theme.CLR_TITLE())
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Character Setup")
             list_y = start_y + 2
             for info_label, info_value in entered_info.items():
-                self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", curses.color_pair(utils.COLOR_GREEN)); list_y += 1
+                self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", theme.CLR_ACCENT()); list_y += 1
             return start_y, start_x, list_y
 
         for label, min_val, max_val in prompts:
@@ -58,16 +57,16 @@ class SetupView:
         h, w = self.stdscr.getmaxyx()
         container_width, container_height = 70, 18
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-        self.stdscr.clear()
+        self.stdscr.erase() # Changed from clear() to erase()
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Character Created")
         list_y = start_y + 2
         for info_label, info_value in entered_info.items():
-            self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", curses.color_pair(utils.COLOR_GREEN)); list_y += 1
+            self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", theme.CLR_ACCENT()); list_y += 1
         
         freebie_msg = "Freebie Points: Unlimited" if is_free_mode else f"Character created with {character.total_freebies} Freebie Points!"
-        self.stdscr.addstr(list_y + 1, start_x + 2, freebie_msg, curses.color_pair(utils.COLOR_GREEN) | curses.A_BOLD)
+        self.stdscr.addstr(list_y + 1, start_x + 2, freebie_msg, theme.CLR_ACCENT())
         
-        self.stdscr.addstr(list_y + 3, start_x + 2, "Press any key to set initial traits...", curses.color_pair(utils.COLOR_YELLOW))
+        self.stdscr.addstr(list_y + 3, start_x + 2, "Press any key to set initial traits...", theme.CLR_BORDER())
         self.stdscr.refresh()
         if self.stdscr.getch() == 24: raise utils.QuitApplication()
         
@@ -80,21 +79,21 @@ class SetupView:
             
             def draw_loop_screen(current_item_name=None):
                 h, w = self.stdscr.getmaxyx()
-                self.stdscr.clear()
+                self.stdscr.erase() # Changed from clear() to erase()
                 container_width, container_height = 60, min(40, h-4)
                 start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
                 utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, title_text)
-                self.stdscr.addstr(start_y + 2, start_x + 2, f"Set initial values ({min_val}-{max_val})", curses.color_pair(utils.COLOR_YELLOW))
-                if is_freeform: self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' to finish.", curses.color_pair(utils.COLOR_YELLOW))
+                self.stdscr.addstr(start_y + 2, start_x + 2, f"Set initial values ({min_val}-{max_val})", theme.CLR_BORDER())
+                if is_freeform: self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' to finish.", theme.CLR_BORDER())
 
                 list_y = start_y + 5
                 max_display = container_height - 9
                 start_idx = max(0, len(entered_items) - max_display + 1)
                 for name, value in list(entered_items.items())[start_idx:]:
                     if list_y >= start_y + container_height - 3: break
-                    self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(utils.COLOR_GREEN)); list_y += 1
+                    self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", theme.CLR_ACCENT()); list_y += 1
                 if current_item_name:
-                    self.stdscr.addstr(list_y, start_x + 2, f"{title_text[:-1]} Name: {current_item_name}")
+                    self.stdscr.addstr(list_y, start_x + 2, f"{title_text[:-1]} Name: {current_item_name}", theme.CLR_TEXT())
                 return start_y, start_x, list_y
 
             if is_freeform:
@@ -127,19 +126,19 @@ class SetupView:
 
         def draw_virtues_screen():
             h, w = self.stdscr.getmaxyx()
-            self.stdscr.clear()
+            self.stdscr.erase() # Changed from clear() to erase()
             container_width, container_height = 60, 20
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Virtues & Path")
-            self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial values (1-10)", curses.color_pair(utils.COLOR_YELLOW))
+            self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial values (1-10)", theme.CLR_BORDER())
             
             list_y = start_y + 4
             for name, value in entered_virtues.items():
-                self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", curses.color_pair(utils.COLOR_GREEN)); list_y += 1
+                self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", theme.CLR_ACCENT()); list_y += 1
             if humanity is not None:
-                self.stdscr.addstr(list_y, start_x + 2, f"Humanity/Path: {humanity}", curses.color_pair(utils.COLOR_GREEN)); list_y += 1
+                self.stdscr.addstr(list_y, start_x + 2, f"Humanity/Path: {humanity}", theme.CLR_ACCENT()); list_y += 1
             if willpower is not None:
-                self.stdscr.addstr(list_y, start_x + 2, f"Willpower: {willpower}", curses.color_pair(utils.COLOR_GREEN)); list_y += 1
+                self.stdscr.addstr(list_y, start_x + 2, f"Willpower: {willpower}", theme.CLR_ACCENT()); list_y += 1
             return start_y, start_x, list_y
 
         for virtue in VIRTUES_LIST:

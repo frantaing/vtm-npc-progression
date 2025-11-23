@@ -2,6 +2,7 @@
 
 import curses
 from . import utils
+from . import theme
 
 class GreetingView:
     def __init__(self, stdscr):
@@ -29,7 +30,7 @@ class GreetingView:
         
         while True:
             h, w = self.stdscr.getmaxyx()
-            self.stdscr.clear()
+            self.stdscr.erase() # Changed from clear() to erase()
             
             container_width, container_height = 70, 16
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
@@ -37,24 +38,23 @@ class GreetingView:
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Welcome")
             
             title = "VTM NPC Progression Tool"
-            self.stdscr.addstr(start_y + 2, start_x + (container_width - len(title)) // 2, title, curses.color_pair(utils.COLOR_MAGENTA) | curses.A_BOLD)
-            self.stdscr.addstr(start_y + 4, start_x + 2, "Please select a mode:")
+            self.stdscr.addstr(start_y + 2, start_x + (container_width - len(title)) // 2, title, theme.CLR_TITLE())
+            self.stdscr.addstr(start_y + 4, start_x + 2, "Please select a mode:", theme.CLR_TEXT())
             
             # Draw menu options
             for i, mode in enumerate(modes):
-                style = curses.A_REVERSE if i == selected else curses.A_NORMAL
-                self.stdscr.addstr(start_y + 6 + i, start_x + 4, f"  {mode['name']}  ", style)
+                style = theme.CLR_SELECTED() if i == selected else theme.CLR_TEXT()
+                prefix = theme.SYM_POINTER if i == selected else "  "
+                self.stdscr.addstr(start_y + 6 + i, start_x + 4, f"{prefix}{mode['name']}  ", style)
             
-            # Draw description box at the bottom
             desc_box_y = start_y + 9
-            desc_box_height = container_height - 10
-            self.stdscr.addstr(desc_box_y, start_x + 3, "─" * (container_width - 6))
+            self.stdscr.addstr(desc_box_y, start_x + 3, theme.SYM_BORDER_H * (container_width - 6), theme.CLR_BORDER())
             
-            # Draw the description of the selected mode
-            utils.draw_wrapped_text(self.stdscr, desc_box_y + 2, start_x + 4, modes[selected]['desc'], container_width - 8, utils.COLOR_YELLOW)
+            utils.draw_wrapped_text(self.stdscr, desc_box_y + 2, start_x + 4, modes[selected]['desc'], container_width - 8, theme.CLR_ACCENT())
             
+            # Color is now CLR_ACCENT
             controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Exit"
-            self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(utils.COLOR_YELLOW))
+            self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, theme.CLR_ACCENT())
             
             self.stdscr.refresh()
             
@@ -63,4 +63,4 @@ class GreetingView:
             elif key in (curses.KEY_UP, curses.KEY_LEFT): selected = (selected - 1 + len(modes)) % len(modes)
             elif key in (curses.KEY_DOWN, curses.KEY_RIGHT): selected = (selected + 1) % len(modes)
             elif key in (curses.KEY_ENTER, ord('\n')):
-                return selected == 1 # Returns True if Free Mode (index 1) is selected
+                return selected == 1
