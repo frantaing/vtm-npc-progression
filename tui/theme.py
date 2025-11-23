@@ -40,6 +40,13 @@ def init_colors():
     # Pair 4: Error (Red on Black)
     curses.init_pair(_ID_ERROR, curses.COLOR_RED, curses.COLOR_BLACK)
 
+def apply_background(stdscr):
+    """
+    Sets the default background style for the entire window.
+    Make sure the black background fills the whole screen, not just text.
+    """
+    stdscr.bkgd(' ', curses.color_pair(_ID_TEXT))
+
 # --- [COLOR HELPERS] ---
 # Return coorect curses attributes
 

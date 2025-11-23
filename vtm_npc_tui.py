@@ -32,6 +32,7 @@ class TUIApp:
         
         # Initialize the Theme
         theme.init_colors()
+        theme.apply_background(self.stdscr) # Initialize background
 
     def run(self):
         """Main application orchestrator."""
