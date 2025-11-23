@@ -13,7 +13,7 @@ class FinalView:
     def show(self):
         """Display the final character sheet before exiting."""
         while True:
-            self.stdscr.clear()
+            self.stdscr.erase() # Changed from clear() to erase()
             h, w = self.stdscr.getmaxyx()
             container_width = min(110, w - 4); container_height = min(55, h - 6)
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
@@ -23,7 +23,8 @@ class FinalView:
             sheet_y, sheet_x = start_y + 2, start_x + 2
             
             self.stdscr.addstr(sheet_y, sheet_x, f"{self.character.name} ({self.character.clan})", theme.CLR_TITLE()); sheet_y += 1
-            self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", theme.CLR_BORDER()); sheet_y += 1
+            # Color is now CLR_ACCENT
+            self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", theme.CLR_ACCENT()); sheet_y += 1
             
             if self.character.is_free_mode:
                 spent_str = f"Total Freebie Points Spent: {self.character.spent_freebies}"
@@ -77,10 +78,10 @@ class FinalView:
     def _display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
         max_name_len = width - 9
         name_part = f"{name[:max_name_len]:<{max_name_len}}"
+        # Simplified color logic
         if data['base'] == data['new']:
             trait_str = f"{name_part} [{data['new']}]"
             self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_TEXT())
         else:
-            trait_str = f"{name_part} [{data['base']}]"
-            self.stdscr.addstr(y, x, trait_str, theme.CLR_TEXT())
-            self.stdscr.addstr(y, x + len(trait_str), f"{theme.SYM_ARROW}[{data['new']}]", theme.CLR_ACCENT())
+            trait_str = f"{name_part} [{data['base']}]→[{data['new']}]"
+            self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_ACCENT())

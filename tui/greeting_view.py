@@ -30,7 +30,7 @@ class GreetingView:
         
         while True:
             h, w = self.stdscr.getmaxyx()
-            self.stdscr.clear()
+            self.stdscr.erase() # Changed from clear() to erase()
             
             container_width, container_height = 70, 16
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
@@ -44,18 +44,17 @@ class GreetingView:
             # Draw menu options
             for i, mode in enumerate(modes):
                 style = theme.CLR_SELECTED() if i == selected else theme.CLR_TEXT()
-                # Add pointers for theme flavor
                 prefix = theme.SYM_POINTER if i == selected else "  "
                 self.stdscr.addstr(start_y + 6 + i, start_x + 4, f"{prefix}{mode['name']}  ", style)
             
             desc_box_y = start_y + 9
             self.stdscr.addstr(desc_box_y, start_x + 3, theme.SYM_BORDER_H * (container_width - 6), theme.CLR_BORDER())
             
-            # Descriptions in Accent Color
             utils.draw_wrapped_text(self.stdscr, desc_box_y + 2, start_x + 4, modes[selected]['desc'], container_width - 8, theme.CLR_ACCENT())
             
+            # Color is now CLR_ACCENT
             controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Exit"
-            self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, theme.CLR_BORDER())
+            self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, theme.CLR_ACCENT())
             
             self.stdscr.refresh()
             
