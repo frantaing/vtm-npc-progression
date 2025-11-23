@@ -4,6 +4,7 @@ import curses
 import textwrap
 from typing import Dict, Any, Optional
 from . import utils
+from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS
 
 class MainView:
@@ -11,7 +12,7 @@ class MainView:
         self.stdscr = stdscr
         self.character = character
         self.message = ""
-        self.message_color = utils.COLOR_GREEN
+        self.message_color = theme.CLR_ACCENT()
 
     def run(self):
         selected = 0
@@ -35,16 +36,16 @@ class MainView:
                 self._handle_improvement_menu(label, category)
 
     def _display_character_sheet(self, y: int, x: int, width: int, height: int):
-        self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], curses.color_pair(utils.COLOR_MAGENTA) | curses.A_BOLD); y += 1
-        self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], curses.color_pair(utils.COLOR_YELLOW)); y += 1
+        self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], theme.CLR_TITLE()); y += 1
+        self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], theme.CLR_BORDER()); y += 1
         
         if self.character.is_free_mode:
             freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
-            color = curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD
+            color = theme.CLR_ACCENT()
         else:
             remaining = self.character.total_freebies - self.character.spent_freebies
             freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
-            color = (curses.color_pair(utils.COLOR_GREEN) if remaining > 0 else curses.color_pair(utils.COLOR_RED)) | curses.A_BOLD
+            color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
         self.stdscr.addstr(y, x, freebie_str, color); y += 2
 
         start_y, max_y = y, y + height
@@ -52,13 +53,13 @@ class MainView:
         col2_x = x + col_width + 2
 
         y_left = start_y
-        self.stdscr.addstr(y_left, col1_x, "═══ ATTRIBUTES ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_left += 1
+        self.stdscr.addstr(y_left, col1_x, f"{theme.SYM_HEADER_L}ATTRIBUTES{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_left += 1
         for name, data in self.character.attributes.items():
             if y_left > max_y: break
             self._display_trait(y_left, col1_x, name, data, col_width); y_left += 1
         y_left += 1
         if y_left <= max_y:
-            self.stdscr.addstr(y_left, col1_x, "═══ ABILITIES ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_left += 1
+            self.stdscr.addstr(y_left, col1_x, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_left += 1
             abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
             for name, data in abilities_shown:
                 if y_left > max_y: break
@@ -68,14 +69,14 @@ class MainView:
         for cat_name in ["disciplines", "backgrounds"]:
             category = getattr(self.character, cat_name)
             if category and y_right <= max_y:
-                self.stdscr.addstr(y_right, col2_x, f"═══ {cat_name.upper()} ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_right += 1
+                self.stdscr.addstr(y_right, col2_x, f"{theme.SYM_HEADER_L}{cat_name.upper()}{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_right += 1
                 for name, data in category.items():
                     if y_right > max_y: break
                     self._display_trait(y_right, col2_x, name, data, col_width); y_right += 1
                 y_right += 1
         
         if y_right <= max_y:
-            self.stdscr.addstr(y_right, col2_x, "═══ VIRTUES & PATH ═══", curses.color_pair(utils.COLOR_CYAN) | curses.A_BOLD); y_right += 1
+            self.stdscr.addstr(y_right, col2_x, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_right += 1
             for name, data in self.character.virtues.items():
                 if y_right > max_y: break
                 self._display_trait(y_right, col2_x, name, data, col_width); y_right += 1
@@ -93,15 +94,15 @@ class MainView:
         panel_content_height = container_height - 6
         self._display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
         
-        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(utils.COLOR_CYAN))
+        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, theme.SYM_BORDER_V, theme.CLR_BORDER())
         
         right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
-        self.stdscr.addstr(menu_y, right_x, "SPEND FREEBIE POINTS", curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD); menu_y += 2
+        self.stdscr.addstr(menu_y, right_x, "SPEND FREEBIE POINTS", theme.CLR_TITLE()); menu_y += 2
         
         for i, (label, category) in enumerate(menu_items):
-            prefix = "► " if i == selected else "  "
+            prefix = theme.SYM_POINTER if i == selected else "  "
             menu_str = f"{prefix}{label} (Cost: {FREEBIE_COSTS.get(category, 'N/A')}/dot)"
-            self.stdscr.addstr(menu_y + i, right_x, menu_str[:right_panel_width], curses.A_REVERSE if i == selected else curses.A_NORMAL)
+            self.stdscr.addstr(menu_y + i, right_x, menu_str[:right_panel_width], theme.CLR_SELECTED() if i == selected else theme.CLR_TEXT())
         
         if self.message:
             msg_y = start_y + container_height - 2
@@ -110,7 +111,7 @@ class MainView:
             utils.draw_wrapped_text(self.stdscr, msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
         
         controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
-        self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, curses.color_pair(utils.COLOR_YELLOW))
+        self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, theme.CLR_BORDER())
 
     def _handle_improvement_menu(self, label: str, category: str):
         if category in ["Humanity", "Willpower"]:
@@ -159,33 +160,32 @@ class MainView:
         panel_content_height = container_height - 6
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, f"Improve {label}")
         self._display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
-        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, "│", curses.color_pair(utils.COLOR_CYAN))
+        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, theme.SYM_BORDER_V, theme.CLR_BORDER())
         right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
         
-        # Count freebie points spent in Free Mode
         if self.character.is_free_mode:
-            self.stdscr.addstr(menu_y, right_x, f"Total Cost: {self.character.spent_freebies}", curses.color_pair(utils.COLOR_YELLOW) | curses.A_BOLD); menu_y += 2
+            self.stdscr.addstr(menu_y, right_x, f"Total Cost: {self.character.spent_freebies}", theme.CLR_ACCENT()); menu_y += 2
         else:
-            self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies}", curses.color_pair(utils.COLOR_GREEN) | curses.A_BOLD); menu_y += 2
-
+            self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies}", theme.CLR_ACCENT()); menu_y += 2
+        
         max_display_items = container_height - 12
         display_list = trait_list + (["** Add New **"] if can_add else [])
         for i in range(max_display_items):
             idx = scroll_offset + i
             if idx >= len(display_list): break
             trait_name = display_list[idx]
-            prefix = "► " if idx == selected else "  "
+            prefix = theme.SYM_POINTER if idx == selected else "  "
             if trait_name == "** Add New **": trait_str = f"{prefix}{trait_name}"
             else:
                 current = self.character.get_trait_data(category, trait_name)['new']
                 trait_str = f"{prefix}{trait_name[:18]:<18} [{current}]"
-            self.stdscr.addstr(menu_y + i, right_x, trait_str[:right_panel_width], curses.A_REVERSE if idx == selected else curses.A_NORMAL)
+            self.stdscr.addstr(menu_y + i, right_x, trait_str[:right_panel_width], theme.CLR_SELECTED() if idx == selected else theme.CLR_TEXT())
         if self.message:
             msg_y = start_y + container_height - 2
             wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
             msg_start_y = msg_y - (len(wrapped_lines) - 1)
             utils.draw_wrapped_text(self.stdscr, msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
-        self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", curses.color_pair(utils.COLOR_YELLOW))
+        self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", theme.CLR_BORDER())
         return start_x, start_y, container_height, right_x, right_panel_width
             
     def _improve_single_trait(self, parent_label: str, category: str, trait_name: str, parent_draw_func, *redraw_args):
@@ -199,9 +199,9 @@ class MainView:
             dialog_width, dialog_height = 50, 8
             dialog_x, dialog_y = (w - dialog_width) // 2, (h - dialog_height) // 2
             utils.draw_box(self.stdscr, dialog_y, dialog_x, dialog_height, dialog_width, "Improve Trait")
-            self.stdscr.addstr(dialog_y + 2, dialog_x + 2, f"Trait: {trait_name}", curses.color_pair(utils.COLOR_YELLOW))
-            self.stdscr.addstr(dialog_y + 3, dialog_x + 2, f"Current: [{current}]", curses.color_pair(utils.COLOR_GREEN))
-            self.stdscr.addstr(dialog_y + 4, dialog_x + 2, f"Max: {max_val}", curses.color_pair(utils.COLOR_YELLOW))
+            self.stdscr.addstr(dialog_y + 2, dialog_x + 2, f"Trait: {trait_name}", theme.CLR_ACCENT())
+            self.stdscr.addstr(dialog_y + 3, dialog_x + 2, f"Current: [{current}]", theme.CLR_TEXT())
+            self.stdscr.addstr(dialog_y + 4, dialog_x + 2, f"Max: {max_val}", theme.CLR_BORDER())
             return dialog_y + 5, dialog_x + 2
 
         target = None
@@ -210,15 +210,16 @@ class MainView:
             target = utils.get_number_input(self.stdscr, f"New value ({current+1}-{max_val}): ", prompt_y, prompt_x, current + 1, max_val, draw_improve_dialog)
         
         success, msg = self.character.improve_trait(category, trait_name, target)
-        if success: self.message, self.message_color = msg, utils.COLOR_GREEN
-        else: utils.show_popup(self.stdscr, "Error", msg, utils.COLOR_RED)
+        if success: self.message, self.message_color = msg, theme.CLR_ACCENT()
+        else: utils.show_popup(self.stdscr, "Error", msg, theme.CLR_ERROR())
 
     def _display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
         max_name_len = width - 9
         name_part = f"{name[:max_name_len]:<{max_name_len}}"
         if data['base'] == data['new']:
             trait_str = f"{name_part} [{data['new']}]"
-            self.stdscr.addstr(y, x, trait_str[:width])
+            self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_TEXT())
         else:
-            trait_str = f"{name_part} [{data['base']}]→[{data['new']}]"
-            self.stdscr.addstr(y, x, trait_str[:width], curses.color_pair(utils.COLOR_GREEN))
+            trait_str = f"{name_part} [{data['base']}]"
+            self.stdscr.addstr(y, x, trait_str, theme.CLR_TEXT())
+            self.stdscr.addstr(y, x + len(trait_str), f"{theme.SYM_ARROW}[{data['new']}]", theme.CLR_ACCENT())
