@@ -27,7 +27,7 @@ class SetupView:
 
         def draw_setup_screen():
             h, w = self.stdscr.getmaxyx()
-            self.stdscr.clear()
+            self.stdscr.erase() # Changed from clear() to erase() to reduce flicker
             container_width, container_height = 70, 18
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             title = "VAMPIRE: THE MASQUERADE - NPC PROGRESSION TOOL"
@@ -57,7 +57,7 @@ class SetupView:
         h, w = self.stdscr.getmaxyx()
         container_width, container_height = 70, 18
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-        self.stdscr.clear()
+        self.stdscr.erase() # Changed from clear() to erase()
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Character Created")
         list_y = start_y + 2
         for info_label, info_value in entered_info.items():
@@ -79,7 +79,7 @@ class SetupView:
             
             def draw_loop_screen(current_item_name=None):
                 h, w = self.stdscr.getmaxyx()
-                self.stdscr.clear()
+                self.stdscr.erase() # Changed from clear() to erase()
                 container_width, container_height = 60, min(40, h-4)
                 start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
                 utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, title_text)
@@ -126,7 +126,7 @@ class SetupView:
 
         def draw_virtues_screen():
             h, w = self.stdscr.getmaxyx()
-            self.stdscr.clear()
+            self.stdscr.erase() # Changed from clear() to erase()
             container_width, container_height = 60, 20
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Virtues & Path")

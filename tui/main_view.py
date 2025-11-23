@@ -37,7 +37,8 @@ class MainView:
 
     def _display_character_sheet(self, y: int, x: int, width: int, height: int):
         self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], theme.CLR_TITLE()); y += 1
-        self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], theme.CLR_BORDER()); y += 1
+        # --- [MODIFIED] --- Color is now CLR_ACCENT
+        self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], theme.CLR_ACCENT()); y += 1
         
         if self.character.is_free_mode:
             freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
@@ -85,7 +86,7 @@ class MainView:
 
     def _draw_main_menu_screen(self, selected, menu_items):
         h, w = self.stdscr.getmaxyx()
-        self.stdscr.clear()
+        self.stdscr.erase() # Changed from clear() to erase()
         container_width, container_height = min(110, w - 4), min(50, h - 6)
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "VTM Elder Creator")
@@ -110,8 +111,9 @@ class MainView:
             msg_start_y = msg_y - (len(wrapped_lines) - 1)
             utils.draw_wrapped_text(self.stdscr, msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
         
+        # Color is now CLR_ACCENT
         controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
-        self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, theme.CLR_BORDER())
+        self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, theme.CLR_ACCENT())
 
     def _handle_improvement_menu(self, label: str, category: str):
         if category in ["Humanity", "Willpower"]:
@@ -153,7 +155,7 @@ class MainView:
     
     def _draw_improvement_menu_screen(self, label, category, trait_list, selected, scroll_offset, can_add):
         h, w = self.stdscr.getmaxyx()
-        self.stdscr.clear()
+        self.stdscr.erase() # Changed from clear() to erase()
         container_width = min(110, w - 4); container_height = min(50, h - 6)
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
         right_panel_width, left_panel_width = 32, container_width - 32 - 5
@@ -185,7 +187,8 @@ class MainView:
             wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
             msg_start_y = msg_y - (len(wrapped_lines) - 1)
             utils.draw_wrapped_text(self.stdscr, msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
-        self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", theme.CLR_BORDER())
+        # Color is now CLR_ACCENT
+        self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", theme.CLR_ACCENT())
         return start_x, start_y, container_height, right_x, right_panel_width
             
     def _improve_single_trait(self, parent_label: str, category: str, trait_name: str, parent_draw_func, *redraw_args):
@@ -216,10 +219,10 @@ class MainView:
     def _display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
         max_name_len = width - 9
         name_part = f"{name[:max_name_len]:<{max_name_len}}"
+        # --- [MODIFIED] --- simplified color logic
         if data['base'] == data['new']:
             trait_str = f"{name_part} [{data['new']}]"
             self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_TEXT())
         else:
-            trait_str = f"{name_part} [{data['base']}]"
-            self.stdscr.addstr(y, x, trait_str, theme.CLR_TEXT())
-            self.stdscr.addstr(y, x + len(trait_str), f"{theme.SYM_ARROW}[{data['new']}]", theme.CLR_ACCENT())
+            trait_str = f"{name_part} [{data['base']}]→[{data['new']}]"
+            self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_ACCENT())
