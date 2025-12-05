@@ -1,6 +1,7 @@
 # tui/final_view.py
 
 import curses
+import os
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter
@@ -13,7 +14,7 @@ class FinalView:
     def show(self):
         """Display the final character sheet before exiting."""
         while True:
-            self.stdscr.erase() # Changed from clear() to erase()
+            self.stdscr.erase()
             h, w = self.stdscr.getmaxyx()
             container_width = min(110, w - 4); container_height = min(55, h - 6)
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
@@ -23,8 +24,7 @@ class FinalView:
             sheet_y, sheet_x = start_y + 2, start_x + 2
             
             self.stdscr.addstr(sheet_y, sheet_x, f"{self.character.name} ({self.character.clan})", theme.CLR_TITLE()); sheet_y += 1
-            # Color is now CLR_ACCENT
-            self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", theme.CLR_ACCENT()); sheet_y += 1
+            self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", theme.CLR_BORDER()); sheet_y += 1
             
             if self.character.is_free_mode:
                 spent_str = f"Total Freebie Points Spent: {self.character.spent_freebies}"
@@ -39,6 +39,7 @@ class FinalView:
             col1_x, col_width = sheet_x, 28
             col2_x = sheet_x + col_width + 4
 
+            # Left Column
             y_left = start_draw_y
             self.stdscr.addstr(y_left, col1_x, f"{theme.SYM_HEADER_L}ATTRIBUTES{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_left += 1
             for n, d in self.character.attributes.items():
@@ -51,6 +52,7 @@ class FinalView:
                     if y_left >= max_draw_y: break
                     self._display_trait(y_left, col1_x, n, d, col_width); y_left += 1
 
+            # Right Column
             y_right = start_draw_y
             for cat in ["disciplines", "backgrounds"]:
                 if getattr(self.character, cat) and y_right < max_draw_y:
@@ -68,17 +70,48 @@ class FinalView:
                 if y_right < max_draw_y: self._display_trait(y_right, col2_x, "Humanity", self.character.humanity, col_width); y_right += 1
                 if y_right < max_draw_y: self._display_trait(y_right, col2_x, "Willpower", self.character.willpower, col_width)
             
-            exit_msg = "Press any key to exit the program..."
-            self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(exit_msg)) // 2, exit_msg, theme.CLR_BORDER())
+            # --- Footer to include Export Option ---
+            controls = "E: Export to Text | Any other key: Exit"
+            self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls)) // 2, controls, theme.CLR_BORDER())
             self.stdscr.refresh()
             
-            if self.stdscr.getch() != curses.KEY_RESIZE:
+            key = self.stdscr.getch()
+            
+            if key == ord('e') or key == ord('E'):
+                self._export_character(start_y + container_height - 2, start_x + 2)
+            elif key != curses.KEY_RESIZE:
                 return
+
+    def _export_character(self, prompt_y, prompt_x):
+        """Handles the logic for exporting character to a text file."""
+        def dummy_redraw():
+            pass
+            
+        default_name = f"{self.character.name.replace(' ', '_').lower()}.txt"
+        
+        # Clear the footer line for the prompt
+        self.stdscr.move(prompt_y, 0)
+        self.stdscr.clrtoeol()
+        
+        filename = utils.get_string_input(self.stdscr, f"Filename (default: {default_name}): ", prompt_y, prompt_x, dummy_redraw)
+        
+        if not filename:
+            filename = default_name
+        
+        # Ensure extension
+        if not filename.endswith('.txt'):
+            filename += ".txt"
+            
+        try:
+            with open(filename, 'w') as f:
+                f.write(self.character.get_text_sheet())
+            utils.show_popup(self.stdscr, "Success", f"Character saved to {filename}", theme.CLR_ACCENT())
+        except Exception as e:
+            utils.show_popup(self.stdscr, "Error", f"Failed to save: {str(e)}", theme.CLR_ERROR())
 
     def _display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
         max_name_len = width - 9
         name_part = f"{name[:max_name_len]:<{max_name_len}}"
-        # Simplified color logic
         if data['base'] == data['new']:
             trait_str = f"{name_part} [{data['new']}]"
             self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_TEXT())

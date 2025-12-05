@@ -124,8 +124,42 @@ class VtMCharacter:
             return False, f"Not enough points! Cost: {total_cost}, Available: {remaining_points}"
 
         trait_data["new"] = target_value
-        
         # Always track spent points
         self.spent_freebies += total_cost
         
         return True, f"'{trait_name}' raised to {target_value}. Cost: {total_cost} points"
+
+    # --- [TEXT EXPORT] ---
+    def get_text_sheet(self) -> str:
+        """Generates a plain text representation of the character sheet."""
+        lines = []
+        lines.append("="*40)
+        lines.append(f"NAME: {self.name} ({self.clan})")
+        lines.append(f"Age: {self.age} | Generation: {self.generation}th")
+        lines.append(f"Freebie Points Spent: {self.spent_freebies}")
+        lines.append("="*40 + "\n")
+
+        def format_section(title, data_dict):
+            if not data_dict: return
+            lines.append(f"--- {title} ---")
+            for name, val in data_dict.items():
+                # Format: "Strength      [3]->[5]" or "Strength      [3]"
+                val_str = f"[{val['new']}]" if val['base'] == val['new'] else f"[{val['base']}->{val['new']}]"
+                lines.append(f"{name:<20} {val_str}")
+            lines.append("") # Empty line
+
+        format_section("ATTRIBUTES", self.attributes)
+        
+        # Filter abilities to show only those > 0
+        active_abilities = {k: v for k, v in self.abilities.items() if v['new'] > 0}
+        format_section("ABILITIES", active_abilities)
+        
+        format_section("DISCIPLINES", self.disciplines)
+        format_section("BACKGROUNDS", self.backgrounds)
+        format_section("VIRTUES", self.virtues)
+
+        lines.append("--- OTHER ---")
+        lines.append(f"{'Humanity/Path':<20} [{self.humanity['new']}]")
+        lines.append(f"{'Willpower':<20} [{self.willpower['new']}]")
+        
+        return "\n".join(lines)
