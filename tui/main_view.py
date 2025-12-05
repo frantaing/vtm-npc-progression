@@ -75,11 +75,11 @@ class MainView:
 
         # --- [Column 2: ABILITIES] ---
         y_c2 = start_y
-        self.stdscr.addstr(y_c2, col2_x, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c2 += 1
+        self.stdscr.addstr(y_c2, col2_x + 2, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c2 += 1
         abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
         for name, data in abilities_shown:
             if y_c2 >= max_y: break
-            self._display_trait(y_c2, col2_x, name, data, col_width); y_c2 += 1
+            self._display_trait(y_c2, col2_x + 2, name, data, col_width - 2); y_c2 += 1
 
         # --- [Column 3: EVERYTHING ELSE] ---
         y_c3 = start_y
@@ -88,20 +88,20 @@ class MainView:
         for cat_name in ["disciplines", "backgrounds"]:
             category = getattr(self.character, cat_name)
             if category and y_c3 < max_y:
-                self.stdscr.addstr(y_c3, col3_x, f"{theme.SYM_HEADER_L}{cat_name.upper()}{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c3 += 1
+                self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}{cat_name.upper()}{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
                 for name, data in category.items():
                     if y_c3 >= max_y: break
-                    self._display_trait(y_c3, col3_x, name, data, col_width); y_c3 += 1
+                    self._display_trait(y_c3, col3_x + 2, name, data, col_width - 2); y_c3 += 1
                 y_c3 += 1
         
         # Virtues & Others
         if y_c3 < max_y:
-            self.stdscr.addstr(y_c3, col3_x, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c3 += 1
+            self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
             for name, data in self.character.virtues.items():
                 if y_c3 >= max_y: break
-                self._display_trait(y_c3, col3_x, name, data, col_width); y_c3 += 1
-            if y_c3 < max_y: self._display_trait(y_c3, col3_x, "Humanity", self.character.humanity, col_width); y_c3 += 1
-            if y_c3 < max_y: self._display_trait(y_c3, col3_x, "Willpower", self.character.willpower, col_width)
+                self._display_trait(y_c3, col3_x + 2, name, data, col_width - 2); y_c3 += 1
+            if y_c3 < max_y: self._display_trait(y_c3, col3_x + 2, "Humanity", self.character.humanity, col_width - 2); y_c3 += 1
+            if y_c3 < max_y: self._display_trait(y_c3, col3_x + 2, "Willpower", self.character.willpower, col_width - 2)
 
     def _draw_main_menu_screen(self, selected, menu_items):
         h, w = self.stdscr.getmaxyx()

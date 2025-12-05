@@ -54,28 +54,28 @@ class FinalView:
 
             # --- [Column 2: ABILITIES] ---
             y_c2 = start_draw_y
-            self.stdscr.addstr(y_c2, col2_x, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c2 += 1
+            self.stdscr.addstr(y_c2, col2_x + 2, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c2 += 1
             for n, d in [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]:
                 if y_c2 >= max_draw_y: break
-                self._display_trait(y_c2, col2_x, n, d, col_width); y_c2 += 1
+                self._display_trait(y_c2, col2_x + 2, n, d, col_width - 2); y_c2 += 1
 
             # --- [Column 3: EVERYTHING ELSE] ---
             y_c3 = start_draw_y
             for cat in ["disciplines", "backgrounds"]:
                 if getattr(self.character, cat) and y_c3 < max_draw_y:
-                    self.stdscr.addstr(y_c3, col3_x, f"{theme.SYM_HEADER_L}{cat.upper()}{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c3 += 1
+                    self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}{cat.upper()}{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
                     for n, d in getattr(self.character, cat).items():
                         if y_c3 >= max_draw_y: break
-                        self._display_trait(y_c3, col3_x, n, d, col_width); y_c3 += 1
+                        self._display_trait(y_c3, col3_x + 2, n, d, col_width - 2); y_c3 += 1
                     y_c3 += 1
             
             if y_c3 < max_draw_y:
-                self.stdscr.addstr(y_c3, col3_x, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c3 += 1
+                self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
                 for n, d in self.character.virtues.items():
                     if y_c3 >= max_draw_y: break
-                    self._display_trait(y_c3, col3_x, n, d, col_width); y_c3 += 1
-                if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x, "Humanity", self.character.humanity, col_width); y_c3 += 1
-                if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x, "Willpower", self.character.willpower, col_width)
+                    self._display_trait(y_c3, col3_x + 2, n, d, col_width - 2); y_c3 += 1
+                if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x + 2, "Humanity", self.character.humanity, col_width - 2); y_c3 += 1
+                if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x + 2, "Willpower", self.character.willpower, col_width - 2)
             
             exit_msg = "Press any key to exit the program..."
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(exit_msg)) // 2, exit_msg, theme.CLR_BORDER())
