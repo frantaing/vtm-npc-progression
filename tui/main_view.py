@@ -36,8 +36,8 @@ class MainView:
                 self._handle_improvement_menu(label, category)
 
     def _display_character_sheet(self, y: int, x: int, width: int, height: int):
+        # Header Info
         self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], theme.CLR_TITLE()); y += 1
-        # --- [MODIFIED] --- Color is now CLR_ACCENT
         self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], theme.CLR_ACCENT()); y += 1
         
         if self.character.is_free_mode:
@@ -49,55 +49,83 @@ class MainView:
             color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
         self.stdscr.addstr(y, x, freebie_str, color); y += 2
 
-        start_y, max_y = y, y + height
-        col1_x, col_width = x, 28
-        col2_x = x + col_width + 2
+        # --- [3-Column Layout Calculations] ---
+        # Subtracting 2 for the vertical separators
+        col_width = (width - 2) // 3
+        
+        start_y = y
+        max_y = y + height
+        
+        col1_x = x
+        col2_x = x + col_width + 1
+        col3_x = x + (col_width * 2) + 2
 
-        y_left = start_y
-        self.stdscr.addstr(y_left, col1_x, f"{theme.SYM_HEADER_L}ATTRIBUTES{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_left += 1
+        # Draw Column Separators
+        for i in range(height - 1):
+            if start_y + i < max_y:
+                self.stdscr.addstr(start_y + i, col1_x + col_width, theme.SYM_BORDER_V, theme.CLR_BORDER())
+                self.stdscr.addstr(start_y + i, col2_x + col_width, theme.SYM_BORDER_V, theme.CLR_BORDER())
+
+        # --- [Column 1: ATTRIBUTES] ---
+        y_c1 = start_y
+        self.stdscr.addstr(y_c1, col1_x, f"{theme.SYM_HEADER_L}ATTRIBUTES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c1 += 1
         for name, data in self.character.attributes.items():
-            if y_left > max_y: break
-            self._display_trait(y_left, col1_x, name, data, col_width); y_left += 1
-        y_left += 1
-        if y_left <= max_y:
-            self.stdscr.addstr(y_left, col1_x, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_left += 1
-            abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
-            for name, data in abilities_shown:
-                if y_left > max_y: break
-                self._display_trait(y_left, col1_x, name, data, col_width); y_left += 1
+            if y_c1 >= max_y: break
+            self._display_trait(y_c1, col1_x, name, data, col_width); y_c1 += 1
 
-        y_right = start_y
+        # --- [Column 2: ABILITIES] ---
+        y_c2 = start_y
+        self.stdscr.addstr(y_c2, col2_x + 2, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c2 += 1
+        abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
+        for name, data in abilities_shown:
+            if y_c2 >= max_y: break
+            self._display_trait(y_c2, col2_x + 2, name, data, col_width - 2); y_c2 += 1
+
+        # --- [Column 3: EVERYTHING ELSE] ---
+        y_c3 = start_y
+        
+        # Disc & BG
         for cat_name in ["disciplines", "backgrounds"]:
             category = getattr(self.character, cat_name)
-            if category and y_right <= max_y:
-                self.stdscr.addstr(y_right, col2_x, f"{theme.SYM_HEADER_L}{cat_name.upper()}{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_right += 1
+            if category and y_c3 < max_y:
+                self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}{cat_name.upper()}{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
                 for name, data in category.items():
-                    if y_right > max_y: break
-                    self._display_trait(y_right, col2_x, name, data, col_width); y_right += 1
-                y_right += 1
+                    if y_c3 >= max_y: break
+                    self._display_trait(y_c3, col3_x + 2, name, data, col_width - 2); y_c3 += 1
+                y_c3 += 1
         
-        if y_right <= max_y:
-            self.stdscr.addstr(y_right, col2_x, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}", theme.CLR_ACCENT()); y_right += 1
+        # Virtues & Others
+        if y_c3 < max_y:
+            self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
             for name, data in self.character.virtues.items():
-                if y_right > max_y: break
-                self._display_trait(y_right, col2_x, name, data, col_width); y_right += 1
-            if y_right <= max_y: self._display_trait(y_right, col2_x, "Humanity", self.character.humanity, col_width); y_right += 1
-            if y_right <= max_y: self._display_trait(y_right, col2_x, "Willpower", self.character.willpower, col_width)
+                if y_c3 >= max_y: break
+                self._display_trait(y_c3, col3_x + 2, name, data, col_width - 2); y_c3 += 1
+            if y_c3 < max_y: self._display_trait(y_c3, col3_x + 2, "Humanity", self.character.humanity, col_width - 2); y_c3 += 1
+            if y_c3 < max_y: self._display_trait(y_c3, col3_x + 2, "Willpower", self.character.willpower, col_width - 2)
 
     def _draw_main_menu_screen(self, selected, menu_items):
         h, w = self.stdscr.getmaxyx()
-        self.stdscr.erase() # Changed from clear() to erase()
-        container_width, container_height = min(110, w - 4), min(50, h - 6)
+        self.stdscr.erase()
+        
+        # Maximize width (w-2) to fit 3 columns
+        container_width = min(130, w - 2)
+        container_height = min(50, h - 4)
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
+        
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "VTM Elder Creator")
         
-        right_panel_width, left_panel_width = 32, container_width - 32 - 5
+        # Adjust panel split
+        right_panel_width = 30 # Made menu slightly narrower
+        left_panel_width = container_width - right_panel_width - 3 # Maximize sheet space
         panel_content_height = container_height - 6
+        
         self._display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
         
-        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, theme.SYM_BORDER_V, theme.CLR_BORDER())
+        # Separator between Sheet and Menu
+        for i in range(1, container_height - 1): 
+            self.stdscr.addstr(start_y + i, start_x + left_panel_width + 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
         
-        right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
+        right_x, menu_y = start_x + left_panel_width + 3, start_y + 2
         self.stdscr.addstr(menu_y, right_x, "SPEND FREEBIE POINTS", theme.CLR_TITLE()); menu_y += 2
         
         for i, (label, category) in enumerate(menu_items):
@@ -111,7 +139,6 @@ class MainView:
             msg_start_y = msg_y - (len(wrapped_lines) - 1)
             utils.draw_wrapped_text(self.stdscr, msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
         
-        # Color is now CLR_ACCENT
         controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
         self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, theme.CLR_ACCENT())
 
@@ -155,15 +182,20 @@ class MainView:
     
     def _draw_improvement_menu_screen(self, label, category, trait_list, selected, scroll_offset, can_add):
         h, w = self.stdscr.getmaxyx()
-        self.stdscr.erase() # Changed from clear() to erase()
-        container_width = min(110, w - 4); container_height = min(50, h - 6)
+        self.stdscr.erase()
+        
+        container_width, container_height = min(130, w - 2), min(50, h - 4) # Match main menu sizing
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-        right_panel_width, left_panel_width = 32, container_width - 32 - 5
+        
+        right_panel_width = 30
+        left_panel_width = container_width - right_panel_width - 3
         panel_content_height = container_height - 6
+        
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, f"Improve {label}")
         self._display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
-        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 2, theme.SYM_BORDER_V, theme.CLR_BORDER())
-        right_x, menu_y = start_x + left_panel_width + 4, start_y + 2
+        
+        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
+        right_x, menu_y = start_x + left_panel_width + 3, start_y + 2
         
         if self.character.is_free_mode:
             self.stdscr.addstr(menu_y, right_x, f"Total Cost: {self.character.spent_freebies}", theme.CLR_ACCENT()); menu_y += 2
@@ -187,8 +219,7 @@ class MainView:
             wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
             msg_start_y = msg_y - (len(wrapped_lines) - 1)
             utils.draw_wrapped_text(self.stdscr, msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
-        # Color is now CLR_ACCENT
-        self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", theme.CLR_ACCENT())
+        self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", theme.CLR_BORDER())
         return start_x, start_y, container_height, right_x, right_panel_width
             
     def _improve_single_trait(self, parent_label: str, category: str, trait_name: str, parent_draw_func, *redraw_args):
@@ -219,7 +250,6 @@ class MainView:
     def _display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
         max_name_len = width - 9
         name_part = f"{name[:max_name_len]:<{max_name_len}}"
-        # --- [MODIFIED] --- simplified color logic
         if data['base'] == data['new']:
             trait_str = f"{name_part} [{data['new']}]"
             self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_TEXT())
