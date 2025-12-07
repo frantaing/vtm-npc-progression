@@ -1,3 +1,5 @@
+# tui/final_view.py
+
 import curses
 from . import utils
 from . import theme
@@ -13,7 +15,7 @@ class FinalView:
         while True:
             self.stdscr.erase()
             h, w = self.stdscr.getmaxyx()
-            container_width = min(130, w - 2) # Maximized width
+            container_width = min(130, w - 2)
             container_height = min(55, h - 6)
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             
@@ -77,11 +79,16 @@ class FinalView:
                 if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x + 2, "Humanity", self.character.humanity, col_width - 2); y_c3 += 1
                 if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x + 2, "Willpower", self.character.willpower, col_width - 2)
             
-            exit_msg = "Press any key to exit the program..."
-            self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(exit_msg)) // 2, exit_msg, theme.CLR_BORDER())
+            # --- [EXPORT PROMPT IS HERE] ---
+            controls = "E: Export to Text | Any other key: Exit"
+            self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls)) // 2, controls, theme.CLR_BORDER())
             self.stdscr.refresh()
             
-            if self.stdscr.getch() != curses.KEY_RESIZE:
+            key = self.stdscr.getch()
+            
+            if key == ord('e') or key == ord('E'):
+                self._export_character(start_y + container_height - 2, start_x + 2)
+            elif key != curses.KEY_RESIZE:
                 return
 
     def _export_character(self, prompt_y, prompt_x):
