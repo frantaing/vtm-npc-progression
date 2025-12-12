@@ -59,6 +59,10 @@ def show_popup(stdscr, title: str, message: str, color_attr=None):
 class QuitApplication(Exception):
     pass
 
+class InputCancelled(Exception):
+    """Used when the user cancels an input (via ESC)"""
+    pass
+
 def get_string_input(stdscr, prompt: str, y: int, x: int, current_screen_func, *args, **kwargs) -> str:
     curses.curs_set(1)
     input_str = ""
@@ -66,15 +70,16 @@ def get_string_input(stdscr, prompt: str, y: int, x: int, current_screen_func, *
 
     while True:
         current_screen_func(*args, **kwargs)
-        stdscr.addstr(y, x, prompt, theme.CLR_ACCENT()) # Prompts are Red
+        stdscr.addstr(y, x, prompt, theme.CLR_ACCENT()) 
         stdscr.addstr(y, input_x_start, " " * 30)
-        stdscr.addstr(y, input_x_start, input_str, theme.CLR_TEXT()) # Input is White
+        stdscr.addstr(y, input_x_start, input_str, theme.CLR_TEXT()) 
         stdscr.move(y, input_x_start + len(input_str))
         stdscr.refresh()
 
         key = stdscr.getch()
 
-        if key == 24: raise QuitApplication()
+        if key == 24: raise QuitApplication() # Ctrl+X
+        elif key == 27: raise InputCancelled() # Esc Key
         elif key in (curses.KEY_ENTER, ord('\n')) and input_str: break
         elif key in (curses.KEY_BACKSPACE, 127, 8): input_str = input_str[:-1]
         elif 32 <= key <= 126 and len(input_str) < 30: input_str += chr(key)

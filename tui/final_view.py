@@ -79,7 +79,7 @@ class FinalView:
                 if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x + 2, "Humanity", self.character.humanity, col_width - 2); y_c3 += 1
                 if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x + 2, "Willpower", self.character.willpower, col_width - 2)
             
-            # --- [EXPORT PROMPT IS HERE] ---
+            # --- [EXPORT PROMPT] ---
             controls = "E: Export to Text | Any other key: Exit"
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls)) // 2, controls, theme.CLR_BORDER())
             self.stdscr.refresh()
@@ -101,7 +101,11 @@ class FinalView:
         self.stdscr.move(prompt_y, 0)
         self.stdscr.clrtoeol()
         
-        filename = utils.get_string_input(self.stdscr, f"Filename (default: {default_name}): ", prompt_y, prompt_x, dummy_redraw)
+        try:
+            # Wrapped in try/except InputCancelled
+            filename = utils.get_string_input(self.stdscr, f"Filename (default: {default_name}): ", prompt_y, prompt_x, dummy_redraw)
+        except utils.InputCancelled:
+            return # Cancel export and go back to sheet loop
         
         if not filename:
             filename = default_name
