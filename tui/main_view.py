@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS
+from .utils import QuitApplication, InputCancelled
 
 class MainView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -172,11 +173,15 @@ class MainView:
                 redraw_args = (label, category, trait_list, selected, scroll_offset, can_add)
                 if can_add and selected == len(trait_list):
                     prompt_y = start_y + container_height - 4
-                    new_name = utils.get_string_input(self.stdscr, f"New {category[:-1]} Name: ", prompt_y, right_x, self._draw_improvement_menu_screen, *redraw_args)
-                    if new_name and new_name.lower() != 'done':
-                        self.character.set_initial_trait(category.lower() + 's', new_name, 0)
-                        trait_list.append(new_name)
-                        self._improve_single_trait(label, category, new_name, self._draw_improvement_menu_screen, *redraw_args)
+                    # [NEW] Wrap in try/except to handle Esc
+                    try:
+                        new_name = utils.get_string_input(self.stdscr, f"New {category[:-1]} Name: ", prompt_y, right_x, self._draw_improvement_menu_screen, *redraw_args)
+                        if new_name and new_name.lower() != 'done':
+                            self.character.set_initial_trait(category.lower() + 's', new_name, 0)
+                            trait_list.append(new_name)
+                            self._improve_single_trait(label, category, new_name, self._draw_improvement_menu_screen, *redraw_args)
+                    except InputCancelled:
+                        self.message = "Cancelled."
                 elif selected < len(trait_list):
                     self._improve_single_trait(label, category, trait_list[selected], self._draw_improvement_menu_screen, *redraw_args)
     
@@ -241,7 +246,12 @@ class MainView:
         target = None
         while target is None:
             prompt_y, prompt_x = draw_improve_dialog()
-            target = utils.get_number_input(self.stdscr, f"New value ({current+1}-{max_val}): ", prompt_y, prompt_x, current + 1, max_val, draw_improve_dialog)
+            # [NEW] Wrap in try/except to handle Esc
+            try:
+                target = utils.get_number_input(self.stdscr, f"New value ({current+1}-{max_val}): ", prompt_y, prompt_x, current + 1, max_val, draw_improve_dialog)
+            except InputCancelled:
+                self.message = "" # Clear message area
+                return # Just return to the menu without doing anything!
         
         success, msg = self.character.improve_trait(category, trait_name, target)
         if success: self.message, self.message_color = msg, theme.CLR_ACCENT()

@@ -27,7 +27,7 @@ class SetupView:
 
         def draw_setup_screen():
             h, w = self.stdscr.getmaxyx()
-            self.stdscr.erase() # Changed from clear() to erase() to reduce flicker
+            self.stdscr.erase()
             container_width, container_height = 70, 18
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             title = "VAMPIRE: THE MASQUERADE - NPC PROGRESSION TOOL"
@@ -42,10 +42,13 @@ class SetupView:
             value = None
             while value is None:
                 start_y, start_x, list_y = draw_setup_screen()
-                if min_val is not None:
-                    value = utils.get_number_input(self.stdscr, f"{label}: ", list_y, start_x + 2, min_val, max_val, draw_setup_screen)
-                else:
-                    value = utils.get_string_input(self.stdscr, f"{label}: ", list_y, start_x + 2, draw_setup_screen)
+                try:
+                    if min_val is not None:
+                        value = utils.get_number_input(self.stdscr, f"{label}: ", list_y, start_x + 2, min_val, max_val, draw_setup_screen)
+                    else:
+                        value = utils.get_string_input(self.stdscr, f"{label}: ", list_y, start_x + 2, draw_setup_screen)
+                except utils.InputCancelled:
+                    continue # Mandatory field, ignore cancel
             entered_info[label] = value
         
         character = VtMCharacter(
@@ -57,7 +60,7 @@ class SetupView:
         h, w = self.stdscr.getmaxyx()
         container_width, container_height = 70, 18
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-        self.stdscr.erase() # Changed from clear() to erase()
+        self.stdscr.erase()
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Character Created")
         list_y = start_y + 2
         for info_label, info_value in entered_info.items():
@@ -79,12 +82,12 @@ class SetupView:
             
             def draw_loop_screen(current_item_name=None):
                 h, w = self.stdscr.getmaxyx()
-                self.stdscr.erase() # Changed from clear() to erase()
+                self.stdscr.erase()
                 container_width, container_height = 60, min(40, h-4)
                 start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
                 utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, title_text)
                 self.stdscr.addstr(start_y + 2, start_x + 2, f"Set initial values ({min_val}-{max_val})", theme.CLR_BORDER())
-                if is_freeform: self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' to finish.", theme.CLR_BORDER())
+                if is_freeform: self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' or Esc to finish.", theme.CLR_BORDER())
 
                 list_y = start_y + 5
                 max_display = container_height - 9
@@ -99,18 +102,35 @@ class SetupView:
             if is_freeform:
                 while True:
                     start_y, start_x, list_y = draw_loop_screen()
-                    item_name = utils.get_string_input(self.stdscr, f"{title_text[:-1]} Name: ", list_y, start_x + 2, draw_loop_screen)
-                    if item_name.lower() == 'done': break
+                    try:
+                        item_name = utils.get_string_input(self.stdscr, f"{title_text[:-1]} Name: ", list_y, start_x + 2, draw_loop_screen)
+                        if item_name.lower() == 'done': break
+                    except utils.InputCancelled:
+                        break # Esc on name entry ends the loop (Same as "done")
+                    
                     val = None
+                    entry_cancelled = False
                     while val is None:
-                        val = utils.get_number_input(self.stdscr, "  Value: ", list_y + 1, start_x + 2, min_val, max_val, draw_loop_screen, current_item_name=item_name)
-                    entered_items[item_name] = val
-                    character.set_initial_trait(title_text.lower(), item_name, val)
+                        start_y, start_x, list_y = draw_loop_screen()
+                        self.stdscr.addstr(list_y, start_x + 2, f"{title_text[:-1]} Name: {item_name}", theme.CLR_TEXT())
+                        try:
+                            val = utils.get_number_input(self.stdscr, "  Value: ", list_y + 1, start_x + 2, min_val, max_val, draw_loop_screen, current_item_name=item_name)
+                        except utils.InputCancelled:
+                            entry_cancelled = True # Cancel adding this specific item
+                            break
+                    
+                    if not entry_cancelled:
+                        entered_items[item_name] = val
+                        character.set_initial_trait(title_text.lower(), item_name, val)
             else:
                 for item in item_list:
                     val = None
                     while val is None:
-                        val = utils.get_number_input(self.stdscr, f"{item}: ", draw_loop_screen()[2], draw_loop_screen()[1] + 2, min_val, max_val, draw_loop_screen)
+                        start_y, start_x, list_y = draw_loop_screen()
+                        try:
+                            val = utils.get_number_input(self.stdscr, f"{item}: ", draw_loop_screen()[2], draw_loop_screen()[1] + 2, min_val, max_val, draw_loop_screen)
+                        except utils.InputCancelled:
+                            continue # Mandatory field
                     entered_items[item] = val
                     character.set_initial_trait(title_text.lower(), item, val)
             return entered_items
@@ -126,7 +146,7 @@ class SetupView:
 
         def draw_virtues_screen():
             h, w = self.stdscr.getmaxyx()
-            self.stdscr.erase() # Changed from clear() to erase()
+            self.stdscr.erase()
             container_width, container_height = 60, 20
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Virtues & Path")
@@ -144,14 +164,26 @@ class SetupView:
         for virtue in VIRTUES_LIST:
             val = None
             while val is None:
-                val = utils.get_number_input(self.stdscr, f"{virtue}: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
+                start_y, start_x, list_y = draw_virtues_screen()
+                try:
+                    val = utils.get_number_input(self.stdscr, f"{virtue}: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
+                except utils.InputCancelled:
+                    continue
             entered_virtues[virtue] = val
             character.set_initial_trait("virtues", virtue, val)
         
         while humanity is None:
-            humanity = utils.get_number_input(self.stdscr, "Humanity/Path: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
+            start_y, start_x, list_y = draw_virtues_screen()
+            try:
+                humanity = utils.get_number_input(self.stdscr, "Humanity/Path: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
+            except utils.InputCancelled:
+                continue
         character.set_initial_value("humanity", humanity)
 
         while willpower is None:
-            willpower = utils.get_number_input(self.stdscr, "Willpower: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
+            start_y, start_x, list_y = draw_virtues_screen()
+            try:
+                willpower = utils.get_number_input(self.stdscr, "Willpower: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
+            except utils.InputCancelled:
+                continue
         character.set_initial_value("willpower", willpower)
