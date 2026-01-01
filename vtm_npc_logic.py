@@ -99,11 +99,17 @@ class VtMCharacter:
         else:
             return getattr(self, category_name.lower())
 
+    # Trait modification
+    # Now handles refunds!
     def improve_trait(self, category_name: str, trait_name: str, target_value: int) -> Tuple[bool, str]:
-        """Attempts to improve a trait by spending freebie points."""
+        """
+        Attempts to modify a trait by spending or refunding freebie points.
+        Returns (Success, Message).
+        """
         cost_per_dot = FREEBIE_COSTS[category_name]
         remaining_points = self.total_freebies - self.spent_freebies
 
+        # Fetch trait data
         if category_name in ["Attribute", "Ability", "Discipline", "Background", "Virtue"]:
             trait_pool = getattr(self, "abilities" if category_name == "Ability" else f"{category_name.lower()}s")
             if trait_name not in trait_pool:
@@ -113,23 +119,42 @@ class VtMCharacter:
             trait_data = getattr(self, category_name.lower())
 
         current_rating = trait_data["new"]
+        base_rating = trait_data["base"]
 
-        if target_value <= current_rating:
-            return False, f"New value must be higher than current ({current_rating})"
+        # Basic Validation
+        if target_value == current_rating:
+            return False, f"Value unchanged."
+        
+        if target_value < base_rating:
+            return False, f"Cannot lower below initial base value ({base_rating})."
 
-        dots_to_add = target_value - current_rating
-        total_cost = dots_to_add * cost_per_dot
+        # Calculate cost (+) or refund (-)
+        dots_diff = target_value - current_rating
+        total_cost = dots_diff * cost_per_dot
 
-        if not self.is_free_mode and remaining_points < total_cost:
+        # If increasing, check affordability
+        if total_cost > 0 and not self.is_free_mode and remaining_points < total_cost:
             return False, f"Not enough points! Cost: {total_cost}, Available: {remaining_points}"
 
+        # Apply changes
         trait_data["new"] = target_value
-        # Always track spent points
-        self.spent_freebies += total_cost
         
-        return True, f"'{trait_name}' raised to {target_value}. Cost: {total_cost} points"
+        # Update spent pool (refunds automatically subtract because total_cost is negative)
+        if not self.is_free_mode:
+            self.spent_freebies += total_cost
+        elif total_cost > 0: 
+            # In free mode, spent freebie points, but refunds just lower the counter
+            self.spent_freebies += total_cost
+        else:
+            # Free mode refund logic
+            # Also keeps coutner accurate
+            self.spent_freebies += total_cost
 
-    # --- [TEXT EXPORT] ---
+        action = "raised" if dots_diff > 0 else "lowered"
+        points_label = "Cost" if dots_diff > 0 else "Refund"
+        
+        return True, f"'{trait_name}' {action} to {target_value}. {points_label}: {abs(total_cost)} points"
+
     def get_text_sheet(self) -> str:
         """Generates a plain text representation of the character sheet."""
         lines = []
@@ -143,17 +168,13 @@ class VtMCharacter:
             if not data_dict: return
             lines.append(f"--- {title} ---")
             for name, val in data_dict.items():
-                # Format: "Strength      [3]->[5]" or "Strength      [3]"
                 val_str = f"[{val['new']}]" if val['base'] == val['new'] else f"[{val['base']}->{val['new']}]"
                 lines.append(f"{name:<20} {val_str}")
-            lines.append("") # Empty line
+            lines.append("")
 
         format_section("ATTRIBUTES", self.attributes)
-        
-        # Filter abilities to show only those > 0
         active_abilities = {k: v for k, v in self.abilities.items() if v['new'] > 0}
         format_section("ABILITIES", active_abilities)
-        
         format_section("DISCIPLINES", self.disciplines)
         format_section("BACKGROUNDS", self.backgrounds)
         format_section("VIRTUES", self.virtues)

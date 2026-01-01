@@ -76,6 +76,7 @@ class MainView:
 
         # --- [Column 2: ABILITIES] ---
         y_c2 = start_y
+        # Padding adjustment: X + 2, Width - 2
         self.stdscr.addstr(y_c2, col2_x + 2, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c2 += 1
         abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
         for name, data in abilities_shown:
@@ -89,6 +90,7 @@ class MainView:
         for cat_name in ["disciplines", "backgrounds"]:
             category = getattr(self.character, cat_name)
             if category and y_c3 < max_y:
+                # Padding adjustment: X + 2, Width - 2
                 self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}{cat_name.upper()}{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
                 for name, data in category.items():
                     if y_c3 >= max_y: break
@@ -97,6 +99,7 @@ class MainView:
         
         # Virtues & Others
         if y_c3 < max_y:
+            # Padding adjustment: X + 2, Width - 2
             self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
             for name, data in self.character.virtues.items():
                 if y_c3 >= max_y: break
@@ -173,14 +176,14 @@ class MainView:
                 redraw_args = (label, category, trait_list, selected, scroll_offset, can_add)
                 if can_add and selected == len(trait_list):
                     prompt_y = start_y + container_height - 4
-                    # [NEW] Wrap in try/except to handle Esc
+                    # Handle ESC
                     try:
                         new_name = utils.get_string_input(self.stdscr, f"New {category[:-1]} Name: ", prompt_y, right_x, self._draw_improvement_menu_screen, *redraw_args)
                         if new_name and new_name.lower() != 'done':
                             self.character.set_initial_trait(category.lower() + 's', new_name, 0)
                             trait_list.append(new_name)
                             self._improve_single_trait(label, category, new_name, self._draw_improvement_menu_screen, *redraw_args)
-                    except InputCancelled:
+                    except utils.InputCancelled:
                         self.message = "Cancelled."
                 elif selected < len(trait_list):
                     self._improve_single_trait(label, category, trait_list[selected], self._draw_improvement_menu_screen, *redraw_args)
@@ -229,8 +232,7 @@ class MainView:
             
     def _improve_single_trait(self, parent_label: str, category: str, trait_name: str, parent_draw_func, *redraw_args):
         trait_data = self.character.get_trait_data(category, trait_name)
-        current, max_val = trait_data['new'], self.character.max_trait_rating
-        if current >= max_val: utils.show_popup(self.stdscr, "Trait at Maximum", f"{trait_name} is already at its maximum value of {max_val}."); return
+        current, base, max_val = trait_data['new'], trait_data['base'], self.character.max_trait_rating
         
         def draw_improve_dialog():
             parent_draw_func(*redraw_args)
@@ -239,19 +241,18 @@ class MainView:
             dialog_x, dialog_y = (w - dialog_width) // 2, (h - dialog_height) // 2
             utils.draw_box(self.stdscr, dialog_y, dialog_x, dialog_height, dialog_width, "Improve Trait")
             self.stdscr.addstr(dialog_y + 2, dialog_x + 2, f"Trait: {trait_name}", theme.CLR_ACCENT())
-            self.stdscr.addstr(dialog_y + 3, dialog_x + 2, f"Current: [{current}]", theme.CLR_TEXT())
+            self.stdscr.addstr(dialog_y + 3, dialog_x + 2, f"Current: [{current}] (Base: {base})", theme.CLR_TEXT())
             self.stdscr.addstr(dialog_y + 4, dialog_x + 2, f"Max: {max_val}", theme.CLR_BORDER())
             return dialog_y + 5, dialog_x + 2
 
         target = None
         while target is None:
             prompt_y, prompt_x = draw_improve_dialog()
-            # [NEW] Wrap in try/except to handle Esc
             try:
-                target = utils.get_number_input(self.stdscr, f"New value ({current+1}-{max_val}): ", prompt_y, prompt_x, current + 1, max_val, draw_improve_dialog)
-            except InputCancelled:
-                self.message = "" # Clear message area
-                return # Just return to the menu without doing anything!
+                target = utils.get_number_input(self.stdscr, f"New value ({base}-{max_val}): ", prompt_y, prompt_x, base, max_val, draw_improve_dialog)
+            except utils.InputCancelled:
+                self.message = ""
+                return
         
         success, msg = self.character.improve_trait(category, trait_name, target)
         if success: self.message, self.message_color = msg, theme.CLR_ACCENT()
