@@ -1,12 +1,10 @@
 # tui/main_view.py
 
 import curses
-import textwrap
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS
-from .utils import QuitApplication, InputCancelled
 
 class MainView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -14,256 +12,237 @@ class MainView:
         self.character = character
         self.message = ""
         self.message_color = theme.CLR_ACCENT()
+        
+        # --- [NAVIGATION STATE] ---
+        # 0=Attributes, 1=Abilities, 2=Other
+        self.active_col = 0 
+        self.active_row = 0
+        
+        # To track list sizes for boundary checking
+        self.col_counts = [0, 0, 0]
 
     def run(self):
-        selected = 0
-        menu_items = [
-            ("Attributes", "Attribute"), ("Abilities", "Ability"), ("Disciplines", "Discipline"),
-            ("Backgrounds", "Background"), ("Virtues", "Virtue"), ("Humanity/Path", "Humanity"),
-            ("Willpower", "Willpower"),
-        ]
-        
+        """Main interaction loop using direct navigation."""
         while True:
-            self._draw_main_menu_screen(selected, menu_items)
+            # 1. Build Data Lists for this Frame
+            col1_items = self._get_col1_items()
+            col2_items = self._get_col2_items()
+            col3_items = self._get_col3_items()
+            
+            # Update counts to prevent out-of-bounds errors
+            self.col_counts = [len(col1_items), len(col2_items), len(col3_items)]
+            
+            # Clamp cursor if list shrank or we switched columns
+            if self.active_row >= self.col_counts[self.active_col]:
+                self.active_row = max(0, self.col_counts[self.active_col] - 1)
+
+            # 2. Draw Screen
+            self._draw_screen(col1_items, col2_items, col3_items)
             self.stdscr.refresh()
             
+            # 3. Handle Input
             key = self.stdscr.getch()
-            if key == 24: return
-            elif key == curses.KEY_RESIZE: self.message = ""
-            elif key == curses.KEY_UP: selected = (selected - 1 + len(menu_items)) % len(menu_items); self.message = ""
-            elif key == curses.KEY_DOWN: selected = (selected + 1) % len(menu_items); self.message = ""
+            
+            if key == 24: return # Ctrl+X
+            elif key == curses.KEY_RESIZE: 
+                self.stdscr.erase()
+            
+            # --- Navigation ---
+            elif key == curses.KEY_UP:
+                self.active_row = max(0, self.active_row - 1)
+                self.message = ""
+            elif key == curses.KEY_DOWN:
+                self.active_row = min(self.col_counts[self.active_col] - 1, self.active_row + 1)
+                self.message = ""
+            elif key == ord(' ') or key == 9: # Space or Tab switches columns
+                self.active_col = (self.active_col + 1) % 3
+                self.active_row = 0 # Reset to top of new column
+                self.message = ""
+            elif key == curses.KEY_LEFT:
+                self._handle_modification(col1_items, col2_items, col3_items, -1)
+            elif key == curses.KEY_RIGHT:
+                self._handle_modification(col1_items, col2_items, col3_items, 1)
             elif key == ord('\n'):
-                label, category = menu_items[selected]
-                self._handle_improvement_menu(label, category)
+                self._handle_enter(col1_items, col2_items, col3_items)
 
-    def _display_character_sheet(self, y: int, x: int, width: int, height: int):
-        # Header Info
-        self.stdscr.addstr(y, x, f"{self.character.name} ({self.character.clan})"[:width], theme.CLR_TITLE()); y += 1
-        self.stdscr.addstr(y, x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}"[:width], theme.CLR_ACCENT()); y += 1
+    # --- [DATA HELPERS] ---
+    # These generate the lists of (Category, Name) tuples for each column.
+    
+    def _get_col1_items(self) -> List[Tuple[str, str]]:
+        return [("Attribute", attr) for attr in ATTRIBUTES_LIST]
+
+    def _get_col2_items(self) -> List[Tuple[str, str]]:
+        # List ALL abilities so user can buy them from 0
+        return [("Ability", abil) for abil in ABILITIES_LIST]
+
+    def _get_col3_items(self) -> List[Tuple[str, str]]:
+        items = []
+        # Disciplines
+        for disc in self.character.disciplines: items.append(("Discipline", disc))
+        items.append(("System", "Add Discipline"))
+        # Backgrounds
+        for bg in self.character.backgrounds: items.append(("Background", bg))
+        items.append(("System", "Add Background"))
+        # Virtues
+        for virt in VIRTUES_LIST: items.append(("Virtue", virt))
+        items.append(("Humanity", "Humanity/Path"))
+        items.append(("Willpower", "Willpower"))
+        return items
+
+    # --- [LOGIC HANDLERS] ---
+    def _handle_modification(self, c1, c2, c3, delta):
+        """Handles Left/Right arrow keys to modify stats."""
+        current_list = [c1, c2, c3][self.active_col]
+        category, name = current_list[self.active_row]
         
-        if self.character.is_free_mode:
-            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
-            color = theme.CLR_ACCENT()
+        # Can't modify "Add New" buttons with arrows
+        if category == "System": return
+
+        # Get current data
+        trait_data = self.character.get_trait_data(category, name)
+        current_val = trait_data['new']
+        target_val = current_val + delta
+        
+        # Attempt improvement (Logic handles bounds and cost)
+        success, msg = self.character.improve_trait(category, name, target_val)
+        
+        if success:
+            self.message = msg
+            self.message_color = theme.CLR_ACCENT()
         else:
-            remaining = self.character.total_freebies - self.character.spent_freebies
-            freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
-            color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
-        self.stdscr.addstr(y, x, freebie_str, color); y += 2
+            # Show errors (like "Not enough points" or "Min value reached")
+            # For silent bounds checking, check if msg contains "limit" logic
+            self.message = msg
+            self.message_color = theme.CLR_ERROR()
 
-        # --- [3-Column Layout Calculations] ---
-        # Subtracting 2 for the vertical separators
-        col_width = (width - 2) // 3
+    def _handle_enter(self, c1, c2, c3):
+        """Handles Enter key for System buttons."""
+        current_list = [c1, c2, c3][self.active_col]
+        category, name = current_list[self.active_row]
         
-        start_y = y
-        max_y = y + height
+        if category == "System":
+            new_cat = "Discipline" if "Discipline" in name else "Background"
+            self._add_new_trait(new_cat)
+
+    def _add_new_trait(self, category):
+        h, w = self.stdscr.getmaxyx()
+        prompt_y = h - 3
+        def dummy_redraw(): pass
         
-        col1_x = x
-        col2_x = x + col_width + 1
-        col3_x = x + (col_width * 2) + 2
+        try:
+            name = utils.get_string_input(self.stdscr, f"New {category} Name: ", prompt_y, 2, dummy_redraw)
+            if name:
+                # Add with base 0
+                self.character.set_initial_trait(category.lower() + 's', name, 0)
+                self.message = f"Added {name}"
+                self.message_color = theme.CLR_ACCENT()
+        except utils.InputCancelled:
+            self.message = "Cancelled"
 
-        # Draw Column Separators
-        for i in range(height - 1):
-            if start_y + i < max_y:
-                self.stdscr.addstr(start_y + i, col1_x + col_width, theme.SYM_BORDER_V, theme.CLR_BORDER())
-                self.stdscr.addstr(start_y + i, col2_x + col_width, theme.SYM_BORDER_V, theme.CLR_BORDER())
-
-        # --- [Column 1: ATTRIBUTES] ---
-        y_c1 = start_y
-        self.stdscr.addstr(y_c1, col1_x, f"{theme.SYM_HEADER_L}ATTRIBUTES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c1 += 1
-        for name, data in self.character.attributes.items():
-            if y_c1 >= max_y: break
-            self._display_trait(y_c1, col1_x, name, data, col_width); y_c1 += 1
-
-        # --- [Column 2: ABILITIES] ---
-        y_c2 = start_y
-        # Padding adjustment: X + 2, Width - 2
-        self.stdscr.addstr(y_c2, col2_x + 2, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c2 += 1
-        abilities_shown = [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]
-        for name, data in abilities_shown:
-            if y_c2 >= max_y: break
-            self._display_trait(y_c2, col2_x + 2, name, data, col_width - 2); y_c2 += 1
-
-        # --- [Column 3: EVERYTHING ELSE] ---
-        y_c3 = start_y
-        
-        # Disc & BG
-        for cat_name in ["disciplines", "backgrounds"]:
-            category = getattr(self.character, cat_name)
-            if category and y_c3 < max_y:
-                # Padding adjustment: X + 2, Width - 2
-                self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}{cat_name.upper()}{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
-                for name, data in category.items():
-                    if y_c3 >= max_y: break
-                    self._display_trait(y_c3, col3_x + 2, name, data, col_width - 2); y_c3 += 1
-                y_c3 += 1
-        
-        # Virtues & Others
-        if y_c3 < max_y:
-            # Padding adjustment: X + 2, Width - 2
-            self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
-            for name, data in self.character.virtues.items():
-                if y_c3 >= max_y: break
-                self._display_trait(y_c3, col3_x + 2, name, data, col_width - 2); y_c3 += 1
-            if y_c3 < max_y: self._display_trait(y_c3, col3_x + 2, "Humanity", self.character.humanity, col_width - 2); y_c3 += 1
-            if y_c3 < max_y: self._display_trait(y_c3, col3_x + 2, "Willpower", self.character.willpower, col_width - 2)
-
-    def _draw_main_menu_screen(self, selected, menu_items):
+    # --- [DRAWING] ---
+    def _draw_screen(self, col1, col2, col3):
         h, w = self.stdscr.getmaxyx()
         self.stdscr.erase()
         
-        # Maximize width (w-2) to fit 3 columns
+        # Maximized width
         container_width = min(130, w - 2)
-        container_height = min(50, h - 4)
+        container_height = min(50, h - 2)
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
         
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "VTM Elder Creator")
         
-        # Adjust panel split
-        right_panel_width = 30 # Made menu slightly narrower
-        left_panel_width = container_width - right_panel_width - 3 # Maximize sheet space
-        panel_content_height = container_height - 6
+        # Header Info
+        header_y = start_y + 1
+        info_str = f"{self.character.name} ({self.character.clan}) | Age: {self.character.age} | Gen: {self.character.generation}th"
+        self.stdscr.addstr(header_y, start_x + 2, info_str, theme.CLR_TITLE())
         
-        self._display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
-        
-        # Separator between Sheet and Menu
-        for i in range(1, container_height - 1): 
-            self.stdscr.addstr(start_y + i, start_x + left_panel_width + 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
-        
-        right_x, menu_y = start_x + left_panel_width + 3, start_y + 2
-        self.stdscr.addstr(menu_y, right_x, "SPEND FREEBIE POINTS", theme.CLR_TITLE()); menu_y += 2
-        
-        for i, (label, category) in enumerate(menu_items):
-            prefix = theme.SYM_POINTER if i == selected else "  "
-            menu_str = f"{prefix}{label} (Cost: {FREEBIE_COSTS.get(category, 'N/A')}/dot)"
-            self.stdscr.addstr(menu_y + i, right_x, menu_str[:right_panel_width], theme.CLR_SELECTED() if i == selected else theme.CLR_TEXT())
-        
-        if self.message:
-            msg_y = start_y + container_height - 2
-            wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
-            msg_start_y = msg_y - (len(wrapped_lines) - 1)
-            utils.draw_wrapped_text(self.stdscr, msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
-        
-        controls = "↑/↓: Navigate | Enter: Select | Ctrl+X: Finalize & Exit"
-        self.stdscr.addstr(h - 1, (w - len(controls)) // 2, controls, theme.CLR_ACCENT())
-
-    def _handle_improvement_menu(self, label: str, category: str):
-        if category in ["Humanity", "Willpower"]:
-            self._improve_single_trait(label, category, "Humanity/Path" if category == "Humanity" else "Willpower", self._draw_main_menu_screen, 0, [])
-            return
-        
-        trait_list_map = { "Attribute": ATTRIBUTES_LIST, "Ability": ABILITIES_LIST, "Discipline": list(self.character.disciplines.keys()), "Background": list(self.character.backgrounds.keys()), "Virtue": VIRTUES_LIST }
-        trait_list = trait_list_map.get(category, [])
-        selected, scroll_offset = 0, 0
-        can_add = category in ["Discipline", "Background"]
-
-        while True:
-            display_list = trait_list + (["** Add New **"] if can_add else [])
-            container_height = min(50, self.stdscr.getmaxyx()[0] - 6)
-            max_items = container_height - 12
-            if selected < scroll_offset: scroll_offset = selected
-            if selected >= scroll_offset + max_items: scroll_offset = selected - max_items + 1
-
-            start_x, start_y, container_height, right_x, right_panel_width = self._draw_improvement_menu_screen(label, category, trait_list, selected, scroll_offset, can_add)
-            self.stdscr.refresh()
-            
-            key = self.stdscr.getch()
-            if key == 24: raise utils.QuitApplication()
-            elif key == 27: self.message = ""; return
-            elif key == curses.KEY_RESIZE: self.message = ""
-            elif key == curses.KEY_UP: selected = (selected - 1 + len(display_list)) % len(display_list); self.message = ""
-            elif key == curses.KEY_DOWN: selected = (selected + 1) % len(display_list); self.message = ""
-            elif key == ord('\n'):
-                redraw_args = (label, category, trait_list, selected, scroll_offset, can_add)
-                if can_add and selected == len(trait_list):
-                    prompt_y = start_y + container_height - 4
-                    # Handle ESC
-                    try:
-                        new_name = utils.get_string_input(self.stdscr, f"New {category[:-1]} Name: ", prompt_y, right_x, self._draw_improvement_menu_screen, *redraw_args)
-                        if new_name and new_name.lower() != 'done':
-                            self.character.set_initial_trait(category.lower() + 's', new_name, 0)
-                            trait_list.append(new_name)
-                            self._improve_single_trait(label, category, new_name, self._draw_improvement_menu_screen, *redraw_args)
-                    except utils.InputCancelled:
-                        self.message = "Cancelled."
-                elif selected < len(trait_list):
-                    self._improve_single_trait(label, category, trait_list[selected], self._draw_improvement_menu_screen, *redraw_args)
-    
-    def _draw_improvement_menu_screen(self, label, category, trait_list, selected, scroll_offset, can_add):
-        h, w = self.stdscr.getmaxyx()
-        self.stdscr.erase()
-        
-        container_width, container_height = min(130, w - 2), min(50, h - 4) # Match main menu sizing
-        start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-        
-        right_panel_width = 30
-        left_panel_width = container_width - right_panel_width - 3
-        panel_content_height = container_height - 6
-        
-        utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, f"Improve {label}")
-        self._display_character_sheet(start_y + 2, start_x + 2, left_panel_width, panel_content_height)
-        
-        for i in range(1, container_height - 1): self.stdscr.addstr(start_y + i, start_x + left_panel_width + 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
-        right_x, menu_y = start_x + left_panel_width + 3, start_y + 2
-        
+        # Freebie Points
+        header_y += 1
         if self.character.is_free_mode:
-            self.stdscr.addstr(menu_y, right_x, f"Total Cost: {self.character.spent_freebies}", theme.CLR_ACCENT()); menu_y += 2
+            spent_str = f"Freebie Points Spent: {self.character.spent_freebies}"
+            color = theme.CLR_ACCENT()
         else:
-            self.stdscr.addstr(menu_y, right_x, f"Available: {self.character.total_freebies - self.character.spent_freebies}", theme.CLR_ACCENT()); menu_y += 2
+            remaining = self.character.total_freebies - self.character.spent_freebies
+            spent_str = f"Freebie: {remaining}/{self.character.total_freebies}"
+            color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
+        self.stdscr.addstr(header_y, start_x + 2, spent_str, color)
+
+        # 3-Column Calculations
+        col_width = (container_width - 4) // 3
+        cx1 = start_x + 2
+        cx2 = cx1 + col_width + 1
+        cx3 = cx2 + col_width + 1
         
-        max_display_items = container_height - 12
-        display_list = trait_list + (["** Add New **"] if can_add else [])
-        for i in range(max_display_items):
-            idx = scroll_offset + i
-            if idx >= len(display_list): break
-            trait_name = display_list[idx]
-            prefix = theme.SYM_POINTER if idx == selected else "  "
-            if trait_name == "** Add New **": trait_str = f"{prefix}{trait_name}"
-            else:
-                current = self.character.get_trait_data(category, trait_name)['new']
-                trait_str = f"{prefix}{trait_name[:18]:<18} [{current}]"
-            self.stdscr.addstr(menu_y + i, right_x, trait_str[:right_panel_width], theme.CLR_SELECTED() if idx == selected else theme.CLR_TEXT())
+        content_y = header_y + 2
+        
+        # Draw Headers
+        self.stdscr.addstr(content_y, cx1, f"{theme.SYM_HEADER_L}ATTRIBUTES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_BORDER())
+        self.stdscr.addstr(content_y, cx2, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_BORDER())
+        self.stdscr.addstr(content_y, cx3, f"{theme.SYM_HEADER_L}OTHERS{theme.SYM_HEADER_R}"[:col_width], theme.CLR_BORDER())
+        
+        # Draw Separators
+        for i in range(content_y + 1, start_y + container_height - 1):
+            self.stdscr.addstr(i, cx2 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
+            self.stdscr.addstr(i, cx3 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
+
+        # Draw Columns
+        list_start_y = content_y + 1
+        max_rows = container_height - 8
+        
+        self._draw_column(list_start_y, cx1, col_width, col1, 0, max_rows)
+        self._draw_column(list_start_y, cx2, col_width, col2, 1, max_rows)
+        self._draw_column(list_start_y, cx3, col_width, col3, 2, max_rows)
+
+        # Footer
         if self.message:
-            msg_y = start_y + container_height - 2
-            wrapped_lines = textwrap.wrap(self.message, right_panel_width - 2)
-            msg_start_y = msg_y - (len(wrapped_lines) - 1)
-            utils.draw_wrapped_text(self.stdscr, msg_start_y, right_x, self.message, right_panel_width - 2, self.message_color)
-        self.stdscr.addstr(h - 1, (w - len("placeholder"))//2, "↑/↓: Navigate | Enter: Improve | Esc: Back", theme.CLR_BORDER())
-        return start_x, start_y, container_height, right_x, right_panel_width
-            
-    def _improve_single_trait(self, parent_label: str, category: str, trait_name: str, parent_draw_func, *redraw_args):
-        trait_data = self.character.get_trait_data(category, trait_name)
-        current, base, max_val = trait_data['new'], trait_data['base'], self.character.max_trait_rating
-        
-        def draw_improve_dialog():
-            parent_draw_func(*redraw_args)
-            h, w = self.stdscr.getmaxyx()
-            dialog_width, dialog_height = 50, 8
-            dialog_x, dialog_y = (w - dialog_width) // 2, (h - dialog_height) // 2
-            utils.draw_box(self.stdscr, dialog_y, dialog_x, dialog_height, dialog_width, "Improve Trait")
-            self.stdscr.addstr(dialog_y + 2, dialog_x + 2, f"Trait: {trait_name}", theme.CLR_ACCENT())
-            self.stdscr.addstr(dialog_y + 3, dialog_x + 2, f"Current: [{current}] (Base: {base})", theme.CLR_TEXT())
-            self.stdscr.addstr(dialog_y + 4, dialog_x + 2, f"Max: {max_val}", theme.CLR_BORDER())
-            return dialog_y + 5, dialog_x + 2
-
-        target = None
-        while target is None:
-            prompt_y, prompt_x = draw_improve_dialog()
-            try:
-                target = utils.get_number_input(self.stdscr, f"New value ({base}-{max_val}): ", prompt_y, prompt_x, base, max_val, draw_improve_dialog)
-            except utils.InputCancelled:
-                self.message = ""
-                return
-        
-        success, msg = self.character.improve_trait(category, trait_name, target)
-        if success: self.message, self.message_color = msg, theme.CLR_ACCENT()
-        else: utils.show_popup(self.stdscr, "Error", msg, theme.CLR_ERROR())
-
-    def _display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
-        max_name_len = width - 9
-        name_part = f"{name[:max_name_len]:<{max_name_len}}"
-        if data['base'] == data['new']:
-            trait_str = f"{name_part} [{data['new']}]"
-            self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_TEXT())
+            utils.draw_wrapped_text(self.stdscr, start_y + container_height - 2, start_x + 2, self.message, container_width - 4, self.message_color)
         else:
-            trait_str = f"{name_part} [{data['base']}]→[{data['new']}]"
-            self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_ACCENT())
+            controls = "Arrows: Modify/Nav | Space: Next Col | Enter: Add New | Ctrl+X: Done"
+            self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls))//2, controls, theme.CLR_ACCENT())
+
+    def _draw_column(self, start_y, start_x, width, items, col_idx, max_rows):
+        # Calculate scroll offset
+        scroll_offset = 0
+        if self.active_col == col_idx:
+            if self.active_row >= max_rows:
+                scroll_offset = self.active_row - max_rows + 1
+        
+        for i in range(max_rows):
+            idx = scroll_offset + i
+            if idx >= len(items): break
+            
+            cat, name = items[idx]
+            is_selected = (self.active_col == col_idx and self.active_row == idx)
+            
+            # Format text
+            if cat == "System":
+                text = f"[ {name} ]"
+                val_str = ""
+            else:
+                data = self.character.get_trait_data(cat, name)
+                text = name
+                # Standard display: [5]
+                val_str = f"[{data['new']}]"
+            
+            # Calculate Colors & Padding
+            # Shift 'x' by 2 for padding, reduce Width by 4 (2 for padding, 2 for safety)
+            draw_x = start_x + 2
+            max_text_w = width - 8
+            
+            if is_selected:
+                style = theme.CLR_HIGHLIGHT()
+                # Draw with Gold Selection Indicators < ... >
+                display_str = f"{theme.SYM_SELECTED_L}{text:<{max_text_w}}{val_str}{theme.SYM_SELECTED_R}"
+                # If selected, we draw slightly to the left to fit the arrows
+                self.stdscr.addstr(start_y + i, draw_x - 2, display_str, style)
+            else:
+                # Check modifications for Color
+                is_modified = False
+                if cat != "System":
+                    data = self.character.get_trait_data(cat, name)
+                    if data['base'] != data['new']:
+                        is_modified = True
+                
+                style = theme.CLR_ACCENT() if is_modified else theme.CLR_TEXT()
+                display_str = f"{text:<{max_text_w}}{val_str}"
+                self.stdscr.addstr(start_y + i, draw_x, display_str, style)
