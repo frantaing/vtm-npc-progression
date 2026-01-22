@@ -1,7 +1,6 @@
-# tui/theme.py
-
 # This flle contains all colors and symbols of the app
 
+# --- [IMPORTS] ---
 import curses
 
 # --- [SYMBOLS] ---

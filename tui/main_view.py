@@ -32,7 +32,7 @@ class MainView:
             # Update counts to prevent out-of-bounds errors
             self.col_counts = [len(col1_items), len(col2_items), len(col3_items)]
             
-            # Clamp cursor if list shrank or we switched columns
+            # Clamp cursor if list shrank or if user switched columns
             if self.active_row >= self.col_counts[self.active_col]:
                 self.active_row = max(0, self.col_counts[self.active_col] - 1)
 
@@ -40,7 +40,7 @@ class MainView:
             self._draw_screen(col1_items, col2_items, col3_items)
             self.stdscr.refresh()
             
-            # 3. Handle Input
+            # 3. Handle input
             key = self.stdscr.getch()
             
             if key == 24: return # Ctrl+X
@@ -58,10 +58,20 @@ class MainView:
                 self.active_col = (self.active_col + 1) % 3
                 self.active_row = 0 # Reset to top of new column
                 self.message = ""
+            
+            # --- Incremental modification (Arrows) ---
             elif key == curses.KEY_LEFT:
                 self._handle_modification(col1_items, col2_items, col3_items, -1)
             elif key == curses.KEY_RIGHT:
                 self._handle_modification(col1_items, col2_items, col3_items, 1)
+            
+            # --- Direct numeric input (0-9) ---
+            elif 48 <= key <= 57:
+                val = key - 48
+                if val == 0: val = 10 # Shortcut: 0 sets value to 10
+                self._handle_numeric_input(col1_items, col2_items, col3_items, val)
+
+            # --- Special Actions ---
             elif key == ord('\n'):
                 self._handle_enter(col1_items, col2_items, col3_items)
 
@@ -103,7 +113,7 @@ class MainView:
         current_val = trait_data['new']
         target_val = current_val + delta
         
-        # Attempt improvement (Logic handles bounds and cost)
+        # Attempt improvement (logic handles bounds and cost)
         success, msg = self.character.improve_trait(category, name, target_val)
         
         if success:
@@ -112,6 +122,29 @@ class MainView:
         else:
             # Show errors (like "Not enough points" or "Min value reached")
             # For silent bounds checking, check if msg contains "limit" logic
+            if "Not enough points" in msg:
+                self.message = msg
+                self.message_color = theme.CLR_ERROR()
+            else:
+                self.message = ""
+
+    # --- Helper for Number Keys ---
+    def _handle_numeric_input(self, c1, c2, c3, value):
+        """Handles pressing keys 0-9 to jump directly to a value."""
+        current_list = [c1, c2, c3][self.active_col]
+        category, name = current_list[self.active_row]
+        
+        if category == "System": return
+
+        # Attempt to set the trait directly to 'value'
+        success, msg = self.character.improve_trait(category, name, value)
+        
+        if success:
+            self.message = msg
+            self.message_color = theme.CLR_ACCENT()
+        else:
+            # Sshow errors for bounds (e.g. trying to set 9 when max is 5)
+            # Or cost issues
             self.message = msg
             self.message_color = theme.CLR_ERROR()
 
@@ -197,7 +230,8 @@ class MainView:
         if self.message:
             utils.draw_wrapped_text(self.stdscr, start_y + container_height - 2, start_x + 2, self.message, container_width - 4, self.message_color)
         else:
-            controls = "Arrows: Modify/Nav | Space: Next Col | Enter: Add New | Ctrl+X: Done"
+            # --- [MODIFIED] Help text to indicate numeric input
+            controls = "Arrows/0-9: Modify | Space: Next Col | Enter: Add | Ctrl+X: Done"
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls))//2, controls, theme.CLR_ACCENT())
 
     def _draw_column(self, start_y, start_x, width, items, col_idx, max_rows):
@@ -233,7 +267,7 @@ class MainView:
                 style = theme.CLR_HIGHLIGHT()
                 # Draw with Gold Selection Indicators < ... >
                 display_str = f"{theme.SYM_SELECTED_L}{text:<{max_text_w}}{val_str}{theme.SYM_SELECTED_R}"
-                # If selected, we draw slightly to the left to fit the arrows
+                # If selected, draw slightly to the left to fit the arrows
                 self.stdscr.addstr(start_y + i, draw_x - 2, display_str, style)
             else:
                 # Check modifications for Color

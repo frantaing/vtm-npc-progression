@@ -1,5 +1,4 @@
-# tui/setup_view.py
-
+# --- [IMPORTS] ---
 import curses
 from typing import Dict, Any, Optional
 from . import utils
