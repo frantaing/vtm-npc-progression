@@ -1,10 +1,11 @@
-# tui/main_view.py
-
+# --- [IMPORTS] ---
 import curses
+import textwrap
 from typing import Dict, Any, Optional, List, Tuple
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS
+from .utils import QuitApplication, InputCancelled
 
 class MainView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -20,11 +21,15 @@ class MainView:
         
         # To track list sizes for boundary checking
         self.col_counts = [0, 0, 0]
+        
+        # Input State (for in-place editing Disciplines/Backgrounds)
+        self.is_inputting = False
+        self.input_buffer = ""
 
     def run(self):
         """Main interaction loop using direct navigation."""
         while True:
-            # 1. Build Data Lists for this Frame
+            # 1. Build data lists for this frame
             col1_items = self._get_col1_items()
             col2_items = self._get_col2_items()
             col3_items = self._get_col3_items()
@@ -36,7 +41,7 @@ class MainView:
             if self.active_row >= self.col_counts[self.active_col]:
                 self.active_row = max(0, self.col_counts[self.active_col] - 1)
 
-            # 2. Draw Screen
+            # 2. Draw screen
             self._draw_screen(col1_items, col2_items, col3_items)
             self.stdscr.refresh()
             
@@ -59,13 +64,13 @@ class MainView:
                 self.active_row = 0 # Reset to top of new column
                 self.message = ""
             
-            # --- Incremental modification (Arrows) ---
+            # --- Modification ---
+            # Arrow keys ('<' & '>')
             elif key == curses.KEY_LEFT:
                 self._handle_modification(col1_items, col2_items, col3_items, -1)
             elif key == curses.KEY_RIGHT:
                 self._handle_modification(col1_items, col2_items, col3_items, 1)
-            
-            # --- Direct numeric input (0-9) ---
+            # Direct numeric input (0-9)
             elif 48 <= key <= 57:
                 val = key - 48
                 if val == 0: val = 10 # Shortcut: 0 sets value to 10
@@ -77,7 +82,6 @@ class MainView:
 
     # --- [DATA HELPERS] ---
     # These generate the lists of (Category, Name) tuples for each column.
-    
     def _get_col1_items(self) -> List[Tuple[str, str]]:
         return [("Attribute", attr) for attr in ATTRIBUTES_LIST]
 
@@ -149,28 +153,51 @@ class MainView:
             self.message_color = theme.CLR_ERROR()
 
     def _handle_enter(self, c1, c2, c3):
-        """Handles Enter key for System buttons."""
         current_list = [c1, c2, c3][self.active_col]
         category, name = current_list[self.active_row]
         
         if category == "System":
             new_cat = "Discipline" if "Discipline" in name else "Background"
-            self._add_new_trait(new_cat)
+            self._add_new_trait(new_cat, c1, c2, c3)
 
-    def _add_new_trait(self, category):
-        h, w = self.stdscr.getmaxyx()
-        prompt_y = h - 3
-        def dummy_redraw(): pass
+    def _add_new_trait(self, category, c1, c2, c3):
+        """
+        In-place input handler.
+        Hijacks the main loop temporarily to update the specific row.
+        """
+        self.is_inputting = True
+        self.input_buffer = ""
         
-        try:
-            name = utils.get_string_input(self.stdscr, f"New {category} Name: ", prompt_y, 2, dummy_redraw)
-            if name:
-                # Add with base 0
-                self.character.set_initial_trait(category.lower() + 's', name, 0)
-                self.message = f"Added {name}"
-                self.message_color = theme.CLR_ACCENT()
-        except utils.InputCancelled:
-            self.message = "Cancelled"
+        curses.curs_set(1) # Show cursor
+        
+        while True:
+            # Redraw the whole screen (which includes the special input row now)
+            self._draw_screen(c1, c2, c3)
+            self.stdscr.refresh()
+            
+            key = self.stdscr.getch()
+            
+            if key == 24: # Ctrl+X (Cancel)
+                self.is_inputting = False
+                curses.curs_set(0)
+                raise QuitApplication()
+            elif key == 27: # Esc (Cancel)
+                self.is_inputting = False
+                self.message = "Cancelled"
+                curses.curs_set(0)
+                return
+            elif key in (curses.KEY_ENTER, ord('\n')): # Enter (Confirm)
+                if self.input_buffer:
+                    self.character.set_initial_trait(category.lower() + 's', self.input_buffer, 0)
+                    self.message = f"Added {self.input_buffer}"
+                    self.message_color = theme.CLR_ACCENT()
+                self.is_inputting = False
+                curses.curs_set(0)
+                return
+            elif key in (curses.KEY_BACKSPACE, 127, 8):
+                self.input_buffer = self.input_buffer[:-1]
+            elif 32 <= key <= 126 and len(self.input_buffer) < 20:
+                self.input_buffer += chr(key)
 
     # --- [DRAWING] ---
     def _draw_screen(self, col1, col2, col3):
@@ -230,8 +257,8 @@ class MainView:
         if self.message:
             utils.draw_wrapped_text(self.stdscr, start_y + container_height - 2, start_x + 2, self.message, container_width - 4, self.message_color)
         else:
-            # --- [MODIFIED] Help text to indicate numeric input
-            controls = "Arrows/0-9: Modify | Space: Next Col | Enter: Add | Ctrl+X: Done"
+            # Controls
+            controls = "Arrows/0-9: Modify | Space: Next Col | Enter: Add/Select | Ctrl+X: Done"
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls))//2, controls, theme.CLR_ACCENT())
 
     def _draw_column(self, start_y, start_x, width, items, col_idx, max_rows):
@@ -248,29 +275,40 @@ class MainView:
             cat, name = items[idx]
             is_selected = (self.active_col == col_idx and self.active_row == idx)
             
-            # Format text
-            if cat == "System":
-                text = f"[ {name} ]"
-                val_str = ""
-            else:
-                data = self.character.get_trait_data(cat, name)
-                text = name
-                # Standard display: [5]
-                val_str = f"[{data['new']}]"
-            
-            # Calculate Colors & Padding
-            # Shift 'x' by 2 for padding, reduce Width by 4 (2 for padding, 2 for safety)
             draw_x = start_x + 2
             max_text_w = width - 8
             
             if is_selected:
                 style = theme.CLR_HIGHLIGHT()
-                # Draw with Gold Selection Indicators < ... >
-                display_str = f"{theme.SYM_SELECTED_L}{text:<{max_text_w}}{val_str}{theme.SYM_SELECTED_R}"
-                # If selected, draw slightly to the left to fit the arrows
+                
+                # --- In-place input rendering ---
+                if self.is_inputting:
+                    # Draw the input box logic: < Poten_ >
+                    # Note: We append '_' to show the cursor position clearly
+                    display_str = f"{theme.SYM_SELECTED_L}{self.input_buffer}_{theme.SYM_SELECTED_R}"
+                else:
+                    # Standard selected behavior
+                    if cat == "System":
+                        text = f"[ {name} ]"
+                        val_str = ""
+                    else:
+                        data = self.character.get_trait_data(cat, name)
+                        text = name
+                        val_str = f"[{data['new']}]"
+                    display_str = f"{theme.SYM_SELECTED_L}{text:<{max_text_w}}{val_str}{theme.SYM_SELECTED_R}"
+                
                 self.stdscr.addstr(start_y + i, draw_x - 2, display_str, style)
             else:
                 # Check modifications for Color
+                # Standard unselected behavior
+                if cat == "System":
+                    text = f"[ {name} ]"
+                    val_str = ""
+                else:
+                    data = self.character.get_trait_data(cat, name)
+                    text = name
+                    val_str = f"[{data['new']}]"
+
                 is_modified = False
                 if cat != "System":
                     data = self.character.get_trait_data(cat, name)

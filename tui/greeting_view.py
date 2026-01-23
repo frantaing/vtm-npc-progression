@@ -1,4 +1,4 @@
-# Imports
+# --- [IMPORTS] ---
 import curses
 from . import utils
 from . import theme
