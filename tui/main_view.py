@@ -15,7 +15,7 @@ class MainView:
         self.message_color = theme.CLR_ACCENT()
         
         # --- [NAVIGATION STATE] ---
-        # 0=Attributes, 1=Abilities, 2=Other
+        # 0=Attributes, 1=Abilities, 2=Everything else
         self.active_col = 0 
         self.active_row = 0
         
@@ -29,17 +29,24 @@ class MainView:
     def run(self):
         """Main interaction loop using direct navigation."""
         while True:
-            # 1. Build data lists for this frame
+            # Build data lists
             col1_items = self._get_col1_items()
             col2_items = self._get_col2_items()
             col3_items = self._get_col3_items()
             
-            # Update counts to prevent out-of-bounds errors
+            # Update counts and clamp cursor
             self.col_counts = [len(col1_items), len(col2_items), len(col3_items)]
             
-            # Clamp cursor if list shrank or if user switched columns
+            # Basic clamp to list length
             if self.active_row >= self.col_counts[self.active_col]:
                 self.active_row = max(0, self.col_counts[self.active_col] - 1)
+            
+            # INITIAL CHECK: If user somehow landed on a header/spacer, move down
+            current_list = [col1_items, col2_items, col3_items][self.active_col]
+            if current_list:
+                item_type = current_list[self.active_row][0]
+                if item_type in ["Header", "Spacer"]:
+                    self._move_cursor(1, current_list)
 
             # 2. Draw screen
             self._draw_screen(col1_items, col2_items, col3_items)
@@ -54,14 +61,22 @@ class MainView:
             
             # --- Navigation ---
             elif key == curses.KEY_UP:
-                self.active_row = max(0, self.active_row - 1)
+                current_list = [col1_items, col2_items, col3_items][self.active_col]
+                self._move_cursor(-1, current_list)
                 self.message = ""
             elif key == curses.KEY_DOWN:
-                self.active_row = min(self.col_counts[self.active_col] - 1, self.active_row + 1)
+                current_list = [col1_items, col2_items, col3_items][self.active_col]
+                self._move_cursor(1, current_list)
                 self.message = ""
             elif key == ord(' ') or key == 9: # Space or Tab switches columns
                 self.active_col = (self.active_col + 1) % 3
                 self.active_row = 0 # Reset to top of new column
+                # Ensure the user doesn't land on a header after switching
+                new_list = [col1_items, col2_items, col3_items][self.active_col]
+                if new_list:
+                    item_type = new_list[0][0]
+                    if item_type in ["Header", "Spacer"]:
+                        self._move_cursor(1, new_list)
                 self.message = ""
             
             # --- Modification ---
@@ -82,25 +97,54 @@ class MainView:
 
     # --- [DATA HELPERS] ---
     # These generate the lists of (Category, Name) tuples for each column.
+    def _move_cursor(self, delta, items):
+        """Moves cursor, skipping over 'Header' and 'Spacer' items."""
+        new_row = self.active_row + delta
+        max_idx = len(items) - 1
+        
+        # Simple bounds check first
+        if new_row < 0: return
+        if new_row > max_idx: return
+        
+        # Check if target is a Header/Spacer. 
+        while 0 <= new_row <= max_idx and items[new_row][0] in ["Header", "Spacer"]:
+            new_row += delta
+        
+        # Re-check bounds after skipping
+        if 0 <= new_row <= max_idx:
+            self.active_row = new_row
+
     def _get_col1_items(self) -> List[Tuple[str, str]]:
-        return [("Attribute", attr) for attr in ATTRIBUTES_LIST]
+        # Added Header to list for auto-centering/alignment
+        return [("Header", "ATTRIBUTES")] + [("Attribute", attr) for attr in ATTRIBUTES_LIST]
 
     def _get_col2_items(self) -> List[Tuple[str, str]]:
         # List ALL abilities so user can buy them from 0
-        return [("Ability", abil) for abil in ABILITIES_LIST]
+        # Added Header to list for auto-centering/alignment
+        return [("Header", "ABILITIES")] + [("Ability", abil) for abil in ABILITIES_LIST]
 
     def _get_col3_items(self) -> List[Tuple[str, str]]:
         items = []
+        
         # Disciplines
+        items.append(("Header", "DISCIPLINES"))
         for disc in self.character.disciplines: items.append(("Discipline", disc))
         items.append(("System", "Add Discipline"))
         # Backgrounds
+        items.append(("Spacer", ""))
+        items.append(("Header", "BACKGROUNDS"))
         for bg in self.character.backgrounds: items.append(("Background", bg))
         items.append(("System", "Add Background"))
         # Virtues
+        items.append(("Spacer", ""))
+        items.append(("Header", "VIRTUES"))
         for virt in VIRTUES_LIST: items.append(("Virtue", virt))
+        # Path/Willpower
+        items.append(("Spacer", ""))
+        items.append(("Header", "PATH/WILLPOWER"))
         items.append(("Humanity", "Humanity/Path"))
         items.append(("Willpower", "Willpower"))
+        
         return items
 
     # --- [LOGIC HANDLERS] ---
@@ -109,8 +153,8 @@ class MainView:
         current_list = [c1, c2, c3][self.active_col]
         category, name = current_list[self.active_row]
         
-        # Can't modify "Add New" buttons with arrows
-        if category == "System": return
+         # Can't modify "Add New" buttons with arrows
+        if category in ["System", "Header", "Spacer"]: return
 
         # Get current data
         trait_data = self.character.get_trait_data(category, name)
@@ -138,7 +182,7 @@ class MainView:
         current_list = [c1, c2, c3][self.active_col]
         category, name = current_list[self.active_row]
         
-        if category == "System": return
+        if category in ["System", "Header", "Spacer"]: return
 
         # Attempt to set the trait directly to 'value'
         success, msg = self.character.improve_trait(category, name, value)
@@ -174,10 +218,9 @@ class MainView:
             # Redraw the whole screen (which includes the special input row now)
             self._draw_screen(c1, c2, c3)
             self.stdscr.refresh()
-            
             key = self.stdscr.getch()
             
-            if key == 24: # Ctrl+X (Cancel)
+            if key == 24: # Ctrl+X (Exit)
                 self.is_inputting = False
                 curses.curs_set(0)
                 raise QuitApplication()
@@ -235,19 +278,20 @@ class MainView:
         
         content_y = header_y + 2
         
-        # Draw Headers
-        self.stdscr.addstr(content_y, cx1, f"{theme.SYM_HEADER_L}ATTRIBUTES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_BORDER())
-        self.stdscr.addstr(content_y, cx2, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_BORDER())
-        self.stdscr.addstr(content_y, cx3, f"{theme.SYM_HEADER_L}OTHERS{theme.SYM_HEADER_R}"[:col_width], theme.CLR_BORDER())
+        # ---------------------------------------------------------------------------------
+        # ! Headers removed from here because they are now part of the data lists.
+        # This makes sure they scroll and align exactly like the rest of the content.
+        # ---------------------------------------------------------------------------------
         
         # Draw Separators
         for i in range(content_y + 1, start_y + container_height - 1):
             self.stdscr.addstr(i, cx2 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
             self.stdscr.addstr(i, cx3 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
 
-        # Draw Columns
-        list_start_y = content_y + 1
-        max_rows = container_height - 8
+        # Draw columns
+        # ! Start list drawing immediately at content_y
+        list_start_y = content_y
+        max_rows = container_height - 7
         
         self._draw_column(list_start_y, cx1, col_width, col1, 0, max_rows)
         self._draw_column(list_start_y, cx2, col_width, col2, 1, max_rows)
@@ -273,6 +317,16 @@ class MainView:
             if idx >= len(items): break
             
             cat, name = items[idx]
+            
+            if cat == "Header":
+                header_text = f"{theme.SYM_HEADER_L}{name}{theme.SYM_HEADER_R}"
+                pad = (width - len(header_text)) // 2
+                self.stdscr.addstr(start_y + i, start_x + max(0, pad), header_text[:width], theme.CLR_BORDER())
+                continue
+            
+            if cat == "Spacer":
+                continue 
+
             is_selected = (self.active_col == col_idx and self.active_row == idx)
             
             draw_x = start_x + 2
@@ -284,7 +338,7 @@ class MainView:
                 # --- In-place input rendering ---
                 if self.is_inputting:
                     # Draw the input box logic: < Poten_ >
-                    # Note: We append '_' to show the cursor position clearly
+                    # Note: append '_' to show the cursor position clearly
                     display_str = f"{theme.SYM_SELECTED_L}{self.input_buffer}_{theme.SYM_SELECTED_R}"
                 else:
                     # Standard selected behavior
