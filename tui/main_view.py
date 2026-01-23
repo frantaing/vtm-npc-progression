@@ -252,7 +252,7 @@ class MainView:
         container_height = min(50, h - 2)
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
         
-        utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "VTM Elder Creator")
+        utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "VTM NPC Progression Tool")
         
         # Header Info
         header_y = start_y + 1
