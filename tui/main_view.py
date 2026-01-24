@@ -1,11 +1,10 @@
 # --- [IMPORTS] ---
 import curses
-import textwrap
-from typing import Dict, Any, Optional, List, Tuple
+from typing import List, Tuple
 from . import utils
 from . import theme
-from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS
-from .utils import QuitApplication, InputCancelled
+from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
+from .utils import QuitApplication
 
 class MainView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -366,7 +365,8 @@ class MainView:
                 is_modified = False
                 if cat != "System":
                     data = self.character.get_trait_data(cat, name)
-                    if data['base'] != data['new']:
+                    # Traits are red if value changed OR if they are dynamic additions (Disciplines/Backgrounds)
+                    if data['base'] != data['new'] or cat in ["Discipline", "Background"]:
                         is_modified = True
                 
                 style = theme.CLR_ACCENT() if is_modified else theme.CLR_TEXT()
