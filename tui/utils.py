@@ -1,5 +1,4 @@
-# tui/utils.py
-
+# --- [IMPORTS] ---
 import curses
 import textwrap
 from . import theme

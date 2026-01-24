@@ -1,5 +1,4 @@
-# tui/greeting_view.py
-
+# --- [IMPORTS] ---
 import curses
 from . import utils
 from . import theme
