@@ -1,52 +1,17 @@
 #!/usr/bin/env python3
 
-"""
-vtm_logic.py
-
-This module contains the character data and business logic for the tool. It is independent of the
-user interface.
-"""
+""" This module contains the character data and business logic for the tool. It is independent of the user interface. """
 
 # --- [IMPORTS] ---
 import sys
 from typing import Dict, List, Tuple
 
-# --- [DATA] ---
-GENERATION_DATA: Dict[int, Dict[str, int]] = {
-    2: {"max_trait": 10}, 3: {"max_trait": 10}, 4: {"max_trait": 9},
-    5: {"max_trait": 8}, 6: {"max_trait": 7}, 7: {"max_trait": 6},
-    8: {"max_trait": 5}, 9: {"max_trait": 5}, 10: {"max_trait": 5},
-    11: {"max_trait": 5}, 12: {"max_trait": 5}, 13: {"max_trait": 5},
-    14: {"max_trait": 5}, 15: {"max_trait": 5}, 16: {"max_trait": 5}
-}
-
-AGE_FREEBIE_BRACKETS: List[Tuple[int, int]] = [
-    (50, 45), (100, 90), (200, 150), (350, 225), (550, 315),
-    (800, 390), (1100, 465), (1450, 525), (1850, 585), (2300, 630),
-    (2800, 675), (3350, 705), (3950, 735), (5600, 750)
-]
-
-FREEBIE_COSTS: Dict[str, int] = {
-    "Attribute": 5, "Ability": 2, "Discipline": 7,
-    "Background": 1, "Virtue": 2, "Humanity": 1, "Willpower": 1
-}
-
-ATTRIBUTES_LIST: List[str] = [
-    "Strength", "Dexterity", "Stamina",
-    "Charisma", "Manipulation", "Appearance",
-    "Perception", "Intelligence", "Wits"
-]
-
-ABILITIES_LIST: List[str] = [
-    "Alertness", "Athletics", "Awareness", "Brawl", "Empathy",
-    "Expression", "Intimidation", "Leadership", "Streetwise", "Subterfuge",
-    "Animal Ken", "Crafts", "Drive", "Etiquette", "Firearms",
-    "Larceny", "Melee", "Performance", "Stealth", "Survival",
-    "Academics", "Computer", "Finance", "Investigation", "Law",
-    "Medicine", "Occult", "Politics", "Science", "Technology"
-]
-
-VIRTUES_LIST: List[str] = ["Conscience", "Self-Control", "Courage"]
+# Import all data from the new 'vtm_data.py'
+from vtm_data import (
+    GENERATION_DATA, AGE_FREEBIE_BRACKETS, FREEBIE_COSTS,
+    ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST,
+    CLAN_DATA, BACKGROUNDS_LIST, DISCIPLINES_LIST
+)
 
 # --- [CHARACTER CLASS] ---
 class VtMCharacter:
@@ -71,6 +36,19 @@ class VtMCharacter:
         
         self.total_freebies = sys.maxsize if self.is_free_mode else self._calculate_total_freebies()
         self.spent_freebies = 0
+
+        # Automatically populate disciplines based on Clan (Case insensitive check)
+        self._apply_clan_disciplines()
+
+    def _apply_clan_disciplines(self):
+        """Checks if the chosen clan exists in data and adds its disciplines."""
+        # Normalize input to Title Case for lookup (e.g. "brujah" -> "Brujah")
+        formatted_clan = self.clan.title()
+        
+        if formatted_clan in CLAN_DATA:
+            for disc in CLAN_DATA[formatted_clan]:
+                # Initialize with 0 dots
+                self.disciplines[disc] = {"base": 0, "new": 0}
 
     def _calculate_total_freebies(self) -> int:
         """Calculates total freebies based on character's age."""
@@ -100,12 +78,8 @@ class VtMCharacter:
             return getattr(self, category_name.lower())
 
     # Trait modification
-    # Now handles refunds!
     def improve_trait(self, category_name: str, trait_name: str, target_value: int) -> Tuple[bool, str]:
-        """
-        Attempts to modify a trait by spending or refunding freebie points.
-        Returns (Success, Message).
-        """
+        """ Attempts to modify a trait by spending or refunding freebie points. Returns (Success, Message). """
         cost_per_dot = FREEBIE_COSTS[category_name]
         remaining_points = self.total_freebies - self.spent_freebies
 
@@ -133,7 +107,7 @@ class VtMCharacter:
         total_cost = dots_diff * cost_per_dot
 
         # If increasing, check affordability
-        if total_cost > 0 and not self.is_free_mode and remaining_points < total_cost:
+        if not self.is_free_mode and remaining_points < total_cost and total_cost > 0:
             return False, f"Not enough points! Cost: {total_cost}, Available: {remaining_points}"
 
         # Apply changes
