@@ -43,22 +43,23 @@ VIRTUES_LIST = ["Conscience", "Self-Control", "Courage"]
 # --- [SELECTION MENUS DATA] ---
 # Standard V20 Backgrounds
 BACKGROUNDS_LIST = [
-    "Allies", "Alternate Identity", "Black Hand Membership", "Contacts", 
-    "Domain", "Fame", "Generation", "Herd", "Influence", "Mentor", 
-    "Resources", "Retainers", "Rituals", "Status"
+    "Allies", "Arsenal", "Contacts", "Fame", "Generation", "Herd",
+    "Influence", "Mentor", "Resources", "Retainers", "Status"
 ]
-# Standard V20 Disciplines (Common + Clan Specifics)
+# V20 Disciplines (Common + Clan Specifics + Bloodline)
 DISCIPLINES_LIST = [
-    "Animalism", "Auspex", "Celerity", "Chimerstry", "Dementation", 
-    "Dominate", "Fortitude", "Necromancy", "Obfuscate", "Obtenebration", 
-    "Potence", "Presence", "Protean", "Quietus", "Serpentis", 
-    "Thaumaturgy", "Vicissitude"
+    "Abombwe", "Animalism", "Auspex", "Bardo", "Celerity", "Chimerstry",
+    "Daimonion", "Deimos", "Dementation", "Dominate", "Fortitude", "Koldunic Sorcery", 
+    "Melpominee", "Mortis", "Mytherceria", "Necromancy", "Obeah", "Obfuscate",
+    "Obtenebration", "Ogham", "Potence", "Presence", "Protean", "Quietus",
+    "Sanguinus", "Serpentis", "Spiritus", "Temporis", "Thaumaturgy", "Thanatosis",
+    "Valeren", "Vicissitude", "Visceratika"
 ]
 # Clan Definitions (Name -> In-Clan Disciplines)
 CLAN_DATA = {
     "Assamite": ["Celerity", "Obfuscate", "Quietus"],
     "Brujah": ["Celerity", "Potence", "Presence"],
-    "Followers of Set": ["Obfuscate", "Presence", "Serpentis"],
+    "Followers Of Set": ["Obfuscate", "Presence", "Serpentis"],
     "Gangrel": ["Animalism", "Fortitude", "Protean"],
     "Giovanni": ["Dominate", "Necromancy", "Potence"],
     "Lasombra": ["Dominate", "Obtenebration", "Potence"],
@@ -69,5 +70,25 @@ CLAN_DATA = {
     "Tremere": ["Auspex", "Dominate", "Thaumaturgy"],
     "Tzimisce": ["Animalism", "Auspex", "Vicissitude"],
     "Ventrue": ["Dominate", "Fortitude", "Presence"],
-    "Caitiff": [] # No In-Clan Disciplines
+    "Cappadocian": ["Auspex", "Fortitude", "Mortis"],
+    "Ahrimanes": ["Animalism", "Protean", "Spiritus"],
+    "Akunanse": ["Abombwe", "Animalism", "Fortitude"],
+    "Baali": ["Daimonion", "Obfuscate", "Presence"],
+    "Blood Brothers": ["Fortitude", "Potence", "Sanguinus"],
+    "Children Of Osiris": ["Bardo", "Dominate", "Potence"],
+    "City Gangrel": ["Celerity", "Obfuscate", "Protean"],
+    "Daughters Of Cacophony": ["Fortitude", "Melpominee", "Presence"],
+    "Gargoyles": ["Fortitude", "Potence", "Visceratika"],
+    "Harbingers Of Skulls": ["Auspex", "Fortitude", "Necromancy"],
+    "Kiasyd": ["Dominate", "Mytherceria", "Obtenebration"],
+    "Lamia": ["Fortitude", "Mortis", "Potence"],
+    "Lhiannan": ["Animalism", "Ogham", "Presence"],
+    "Maeghar": ["Mytherceria", "Necromancy"],
+    "Nagaraja": ["Auspex", "Dominate", "Necromancy"],
+    "Salubri": ["Auspex", "Fortitude", "Valeren"],
+    "Samedi": ["Fortitude", "Obfuscate", "Thanatosis"],
+    "True Brujah": ["Fortitude", "Potence", "Temporis"],
+    "Caitiff": [], # No In-Clan Disciplines
+    "Pander": [], # No In-Clan Disciplines
+    "Thin Blood": [] # No In-Clan Disciplines
 }
