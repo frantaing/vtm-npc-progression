@@ -1,7 +1,8 @@
-# VTM NPC Progression Tool
 A CLI and TUI tool for creating and progressing Vampire: The Masquerade (V20) characters, specifically for creating NPCs.
 
-This is a personal project for me to happily make characters to use as a foundation or baseline for NPC characters. This is also an excuse to learn how to make TUIs with Python.
+This is a personal project for me to happily make characters to use as a foundation or baseline for NPC characters.
+
+<img align="center" alt="image" src="https://github.com/user-attachments/assets/e325c139-2bf4-4bfd-bf03-71cdde6dcf83" />
 
 ## Why?
 How do I stat out a 500 year old Ministry character who just woke up? Standard character creation is designed for fledglings/neonates, not older and more experienced Kindred.
