@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
+from vtm_data import CLAN_DATA
 
 class SetupView:
     def __init__(self, stdscr):
@@ -18,9 +19,14 @@ class SetupView:
         return character
 
     def _setup_character(self, is_free_mode: bool) -> Optional[VtMCharacter]:
+        # Convert CLAN_DATA keys to a sorted list for the menu
+        clan_list = sorted(list(CLAN_DATA.keys()))
+        
         prompts = [
-            ("Character Name", None, None), ("Clan", None, None),
-            ("Age (0-5600+)", 0, 10000), ("Generation (2-16)", 2, 16)
+            ("Character Name", None, None, None),
+            ("Clan", clan_list, None, None),
+            ("Age (0-5600+)", None, 0, 10000),
+            ("Generation (2-16)", None, 2, 16)
         ]
         entered_info: Dict[str, Any] = {}
 
@@ -37,17 +43,23 @@ class SetupView:
                 self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", theme.CLR_ACCENT()); list_y += 1
             return start_y, start_x, list_y
 
-        for label, min_val, max_val in prompts:
+        for label, option_list, min_val, max_val in prompts:
             value = None
             while value is None:
                 start_y, start_x, list_y = draw_setup_screen()
                 try:
+                    # Check which input method to use
                     if min_val is not None:
                         value = utils.get_number_input(self.stdscr, f"{label}: ", list_y, start_x + 2, min_val, max_val, draw_setup_screen)
+                    elif option_list is not None:
+                        # Use the Hybrid Selection (see utils.py)
+                        value = utils.get_selection_input(self.stdscr, f"{label}: ", list_y, start_x + 2, option_list, draw_setup_screen)
                     else:
                         value = utils.get_string_input(self.stdscr, f"{label}: ", list_y, start_x + 2, draw_setup_screen)
                 except utils.InputCancelled:
-                    continue # Mandatory field, ignore cancel
+                    # Mandatory field: Ignore Esc and re-prompt
+                    continue
+            
             entered_info[label] = value
         
         character = VtMCharacter(
@@ -70,7 +82,10 @@ class SetupView:
         
         self.stdscr.addstr(list_y + 3, start_x + 2, "Press any key to set initial traits...", theme.CLR_BORDER())
         self.stdscr.refresh()
-        if self.stdscr.getch() == 24: raise utils.QuitApplication()
+        
+        # If Ctrl+X, quit
+        key = self.stdscr.getch()
+        if key == 24: raise utils.QuitApplication()
         
         return character
 
@@ -86,7 +101,7 @@ class SetupView:
                 start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
                 utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, title_text)
                 self.stdscr.addstr(start_y + 2, start_x + 2, f"Set initial values ({min_val}-{max_val})", theme.CLR_BORDER())
-                if is_freeform: self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' or Esc to finish.", theme.CLR_BORDER())
+                if is_freeform: self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' or Press Esc to finish.", theme.CLR_BORDER())
 
                 list_y = start_y + 5
                 max_display = container_height - 9
@@ -103,33 +118,30 @@ class SetupView:
                     start_y, start_x, list_y = draw_loop_screen()
                     try:
                         item_name = utils.get_string_input(self.stdscr, f"{title_text[:-1]} Name: ", list_y, start_x + 2, draw_loop_screen)
-                        if item_name.lower() == 'done': break
                     except utils.InputCancelled:
-                        break # Esc on name entry ends the loop (Same as "done")
+                        break # Esc in freeform name entry means "I'm done adding items"
+                    
+                    if item_name.lower() == 'done': break
                     
                     val = None
-                    entry_cancelled = False
                     while val is None:
-                        start_y, start_x, list_y = draw_loop_screen()
-                        self.stdscr.addstr(list_y, start_x + 2, f"{title_text[:-1]} Name: {item_name}", theme.CLR_TEXT())
                         try:
                             val = utils.get_number_input(self.stdscr, "  Value: ", list_y + 1, start_x + 2, min_val, max_val, draw_loop_screen, current_item_name=item_name)
                         except utils.InputCancelled:
-                            entry_cancelled = True # Cancel adding this specific item
-                            break
+                            # If user cancels value entry, just re-prompt for the value 
+                            continue 
                     
-                    if not entry_cancelled:
-                        entered_items[item_name] = val
-                        character.set_initial_trait(title_text.lower(), item_name, val)
+                    entered_items[item_name] = val
+                    character.set_initial_trait(title_text.lower(), item_name, val)
             else:
                 for item in item_list:
                     val = None
                     while val is None:
-                        start_y, start_x, list_y = draw_loop_screen()
                         try:
                             val = utils.get_number_input(self.stdscr, f"{item}: ", draw_loop_screen()[2], draw_loop_screen()[1] + 2, min_val, max_val, draw_loop_screen)
                         except utils.InputCancelled:
-                            continue # Mandatory field
+                            # Mandatory list item: Ignore Esc and re-prompt
+                            continue
                     entered_items[item] = val
                     character.set_initial_trait(title_text.lower(), item, val)
             return entered_items
@@ -163,7 +175,6 @@ class SetupView:
         for virtue in VIRTUES_LIST:
             val = None
             while val is None:
-                start_y, start_x, list_y = draw_virtues_screen()
                 try:
                     val = utils.get_number_input(self.stdscr, f"{virtue}: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
                 except utils.InputCancelled:
@@ -172,7 +183,6 @@ class SetupView:
             character.set_initial_trait("virtues", virtue, val)
         
         while humanity is None:
-            start_y, start_x, list_y = draw_virtues_screen()
             try:
                 humanity = utils.get_number_input(self.stdscr, "Humanity/Path: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
             except utils.InputCancelled:
@@ -180,7 +190,6 @@ class SetupView:
         character.set_initial_value("humanity", humanity)
 
         while willpower is None:
-            start_y, start_x, list_y = draw_virtues_screen()
             try:
                 willpower = utils.get_number_input(self.stdscr, "Willpower: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
             except utils.InputCancelled:

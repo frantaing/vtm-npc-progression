@@ -97,3 +97,80 @@ def get_number_input(stdscr, prompt: str, y: int, x: int, min_val: int, max_val:
     except ValueError:
         show_popup(stdscr, "Invalid Input", "That is not a valid number. Please try again.")
         return None
+
+# --- Hybrid Selection Input ---
+def get_selection_input(stdscr, prompt: str, y: int, x: int, options: list, current_screen_func, *args, **kwargs) -> str:
+    """
+    Allows user to select from a list using arrows OR type manually.
+    - Arrows (Up/Down/Left/Right): Cycle through options.
+    - Typing: Switches to manual input mode.
+    - Backspace (on empty buffer): Reverts to selection mode.
+    """
+    curses.curs_set(0) # Start hidden (Selection mode)
+    
+    is_manual = False
+    manual_buffer = ""
+    selection_index = 0
+    input_x_start = x + len(prompt)
+    
+    while True:
+        # Redraw background to prevent trails
+        current_screen_func(*args, **kwargs)
+        
+        # Draw Prompt
+        stdscr.addstr(y, x, prompt, theme.CLR_ACCENT())
+        
+        # Clear the area where input goes
+        stdscr.addstr(y, input_x_start, " " * 40)
+        
+        # Draw Input Value
+        if is_manual:
+            curses.curs_set(1)
+            stdscr.addstr(y, input_x_start, manual_buffer, theme.CLR_TEXT())
+            stdscr.move(y, input_x_start + len(manual_buffer))
+        else:
+            curses.curs_set(0)
+            current_opt = options[selection_index]
+            # Draw as < Option >
+            display_str = f"{theme.SYM_SELECTED_L}{current_opt}{theme.SYM_SELECTED_R}"
+            stdscr.addstr(y, input_x_start, display_str, theme.CLR_HIGHLIGHT())
+
+        stdscr.refresh()
+        key = stdscr.getch()
+
+        # --- Key Handling ---
+        if key == 24: # Ctrl+X
+            raise QuitApplication()
+        elif key == 27: # Esc
+            raise InputCancelled()
+        
+        elif key in (curses.KEY_ENTER, ord('\n')):
+            curses.curs_set(0)
+            if is_manual:
+                return manual_buffer.strip()
+            return options[selection_index]
+
+        # Navigation (Cycles options if not manual, ignored if manual)
+        elif key in (curses.KEY_UP, curses.KEY_RIGHT): 
+            if not is_manual:
+                selection_index = (selection_index + 1) % len(options)
+        elif key in (curses.KEY_DOWN, curses.KEY_LEFT):
+            if not is_manual:
+                selection_index = (selection_index - 1 + len(options)) % len(options)
+
+        # Backspace handling
+        elif key in (curses.KEY_BACKSPACE, 127, 8):
+            if is_manual:
+                manual_buffer = manual_buffer[:-1]
+                # If buffer empty, revert to list mode
+                if not manual_buffer:
+                    is_manual = False
+        
+        # Typing (Switches to Manual)
+        elif 32 <= key <= 126:
+            if not is_manual:
+                is_manual = True
+                manual_buffer = "" # Start fresh
+            
+            if len(manual_buffer) < 30:
+                manual_buffer += chr(key)
