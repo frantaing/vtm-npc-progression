@@ -40,7 +40,11 @@ class SetupView:
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Character Setup")
             list_y = start_y + 2
             for info_label, info_value in entered_info.items():
-                self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", theme.CLR_ACCENT()); list_y += 1
+                # Label -> RED!
+                self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: ", theme.CLR_ACCENT())
+                # Conf value -> WHITE!
+                self.stdscr.addstr(list_y, start_x + 2 + len(info_label) + 2, f"{info_value}", theme.CLR_TEXT())
+                list_y += 1
             return start_y, start_x, list_y
 
         for label, option_list, min_val, max_val in prompts:
@@ -107,8 +111,12 @@ class SetupView:
                 max_display = container_height - 9
                 start_idx = max(0, len(entered_items) - max_display + 1)
                 for name, value in list(entered_items.items())[start_idx:]:
-                    if list_y >= start_y + container_height - 3: break
-                    self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", theme.CLR_ACCENT()); list_y += 1
+                    if list_y >= start_y + container_height - 3: break                        
+                    # Draw label in Red
+                    self.stdscr.addstr(list_y, start_x + 2, f"{name}: ", theme.CLR_ACCENT())
+                    # Draw confirmed value in White
+                    self.stdscr.addstr(list_y, start_x + 2 + len(name) + 2, f"{value}", theme.CLR_TEXT())
+                    list_y += 1
                 if current_item_name:
                     self.stdscr.addstr(list_y, start_x + 2, f"{title_text[:-1]} Name: {current_item_name}", theme.CLR_TEXT())
                 return start_y, start_x, list_y
@@ -162,13 +170,19 @@ class SetupView:
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Virtues & Path")
             self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial values (1-10)", theme.CLR_BORDER())
             
-            list_y = start_y + 4
-            for name, value in entered_virtues.items():
-                self.stdscr.addstr(list_y, start_x + 2, f"{name}: {value}", theme.CLR_ACCENT()); list_y += 1
+            list_y = start_y + 4 # Labels -> RED; Conf input -> WHITE
+            for name, value in entered_virtues.items(): # 
+                self.stdscr.addstr(list_y, start_x + 2, f"{name}: ", theme.CLR_ACCENT())
+                self.stdscr.addstr(list_y, start_x + 2 + len(name) + 2, f"{value}", theme.CLR_TEXT())
+                list_y += 1
             if humanity is not None:
-                self.stdscr.addstr(list_y, start_x + 2, f"Humanity/Path: {humanity}", theme.CLR_ACCENT()); list_y += 1
+                self.stdscr.addstr(list_y, start_x + 2, "Humanity/Path: ", theme.CLR_ACCENT())
+                self.stdscr.addstr(list_y, start_x + 2 + len("Humanity/Path: "), f"{humanity}", theme.CLR_TEXT())
+                list_y += 1
             if willpower is not None:
-                self.stdscr.addstr(list_y, start_x + 2, f"Willpower: {willpower}", theme.CLR_ACCENT()); list_y += 1
+                self.stdscr.addstr(list_y, start_x + 2, "Willpower: ", theme.CLR_ACCENT())
+                self.stdscr.addstr(list_y, start_x + 2 + len("Willpower: "), f"{willpower}", theme.CLR_TEXT())
+                list_y += 1
             return start_y, start_x, list_y
 
         for virtue in VIRTUES_LIST:

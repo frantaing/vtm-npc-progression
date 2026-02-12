@@ -71,7 +71,7 @@ def get_string_input(stdscr, prompt: str, y: int, x: int, current_screen_func, *
         current_screen_func(*args, **kwargs)
         stdscr.addstr(y, x, prompt, theme.CLR_ACCENT()) 
         stdscr.addstr(y, input_x_start, " " * 30)
-        stdscr.addstr(y, input_x_start, input_str, theme.CLR_TEXT()) 
+        stdscr.addstr(y, input_x_start, input_str, theme.CLR_HIGHLIGHT()) # Str input: WHITE -> GOLD (highlight)
         stdscr.move(y, input_x_start + len(input_str))
         stdscr.refresh()
 
@@ -98,7 +98,7 @@ def get_number_input(stdscr, prompt: str, y: int, x: int, min_val: int, max_val:
         show_popup(stdscr, "Invalid Input", "That is not a valid number. Please try again.")
         return None
 
-# --- Hybrid Selection Input ---
+# --- Selection + Manual Input ---
 def get_selection_input(stdscr, prompt: str, y: int, x: int, options: list, current_screen_func, *args, **kwargs) -> str:
     """
     Allows user to select from a list using arrows OR type manually.
@@ -126,7 +126,7 @@ def get_selection_input(stdscr, prompt: str, y: int, x: int, options: list, curr
         # Draw Input Value
         if is_manual:
             curses.curs_set(1)
-            stdscr.addstr(y, input_x_start, manual_buffer, theme.CLR_TEXT())
+            stdscr.addstr(y, input_x_start, manual_buffer, theme.CLR_HIGHLIGHT()) # Manual: WHITE -> GOLD (highlight)
             stdscr.move(y, input_x_start + len(manual_buffer))
         else:
             curses.curs_set(0)
