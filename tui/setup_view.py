@@ -146,10 +146,9 @@ class SetupView:
                     character.set_initial_trait(title_text.lower(), item, val)
             return entered_items
 
+        # --- NOTE: Removed the Disciplines and Backgrounds loops ---
         run_setup_loop("Attributes", ATTRIBUTES_LIST, 1, 10)
         run_setup_loop("Abilities", ABILITIES_LIST, 0, 10)
-        run_setup_loop("Disciplines", [], 1, 10, is_freeform=True)
-        run_setup_loop("Backgrounds", [], 1, 10, is_freeform=True)
         
         entered_virtues: Dict[str, Any] = {}
         humanity: Optional[int] = None
