@@ -4,6 +4,7 @@ from typing import List, Tuple
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
+from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS, DISCIPLINES_LIST, BACKGROUNDS_LIST
 from .utils import QuitApplication
 
 class MainView:
@@ -89,6 +90,10 @@ class MainView:
                 val = key - 48
                 if val == 0: val = 10 # Shortcut: 0 sets value to 10
                 self._handle_numeric_input(col1_items, col2_items, col3_items, val)
+            
+            # --- Deletion ---
+            elif key == curses.KEY_DC or key == ord('x'):
+                self._handle_deletion(col1_items, col2_items, col3_items)
 
             # --- Special Actions ---
             elif key == ord('\n'):
