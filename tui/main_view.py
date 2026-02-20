@@ -3,7 +3,6 @@ import curses
 from typing import List, Tuple
 from . import utils
 from . import theme
-from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS, DISCIPLINES_LIST, BACKGROUNDS_LIST
 from .utils import QuitApplication
 
@@ -34,10 +33,7 @@ class MainView:
             col2_items = self._get_col2_items()
             col3_items = self._get_col3_items()
             
-            # Update counts and clamp cursor
             self.col_counts = [len(col1_items), len(col2_items), len(col3_items)]
-            
-            # Basic clamp to list length
             if self.active_row >= self.col_counts[self.active_col]:
                 self.active_row = max(0, self.col_counts[self.active_col] - 1)
             
@@ -48,11 +44,8 @@ class MainView:
                 if item_type in ["Header", "Spacer"]:
                     self._move_cursor(1, current_list)
 
-            # 2. Draw screen
             self._draw_screen(col1_items, col2_items, col3_items)
             self.stdscr.refresh()
-            
-            # 3. Handle input
             key = self.stdscr.getch()
             
             if key == 24: return # Ctrl+X
@@ -91,7 +84,7 @@ class MainView:
                 if val == 0: val = 10 # Shortcut: 0 sets value to 10
                 self._handle_numeric_input(col1_items, col2_items, col3_items, val)
             
-            # --- Deletion ---
+            # --- Deletion key ---
             elif key == curses.KEY_DC or key == ord('x'):
                 self._handle_deletion(col1_items, col2_items, col3_items)
 
@@ -209,42 +202,101 @@ class MainView:
             self._add_new_trait(new_cat, c1, c2, c3)
 
     def _add_new_trait(self, category, c1, c2, c3):
-        """
-        In-place input handler.
-        Hijacks the main loop temporarily to update the specific row.
-        """
         self.is_inputting = True
-        self.input_buffer = ""
+        curses.curs_set(1)
         
-        curses.curs_set(1) # Show cursor
+        # Prepare the list (exclude existing traits)
+        if category == "Discipline":
+            options = sorted([d for d in DISCIPLINES_LIST if d not in self.character.disciplines])
+        elif category == "Background":
+            options = sorted([b for b in BACKGROUNDS_LIST if b not in self.character.backgrounds])
+        else:
+            options = []
+
+        # 2. Calculate coordinates for in-line inputs
+        h, w = self.stdscr.getmaxyx()
         
-        while True:
-            # Redraw the whole screen (which includes the special input row now)
+        # Re-calculate layout (must match _draw_screen logic!!)
+        container_width = min(130, w - 2)
+        container_height = min(50, h - 2)
+        start_x = (w - container_width) // 2
+        start_y = (h - container_height) // 2
+        
+        col_width = (container_width - 4) // 3
+        # Calculate X for col3
+        col3_x = start_x + 2 + (col_width + 1) * 2
+        
+        # Calculate Y for the Active Row
+        # Logic: Header (1) + Points (1) + Headers (2) + List Start (1) = +5 offset from start_y?
+        # Verify _draw_screen: 
+        # header_y = start_y + 1
+        # content_y = header_y + 2 (so start_y + 3)
+        # list_start_y = content_y + 1 (so start_y + 4)
+        list_start_y = start_y + 4
+        max_rows = container_height - 8
+        
+        # Calculate scroll offset for Col 3
+        scroll_offset = 0
+        if self.active_col == 2: # Column 3
+            if self.active_row >= max_rows:
+                scroll_offset = self.active_row - max_rows + 1
+        
+        # The visual row index (0 to max_rows)
+        visual_row_index = self.active_row - scroll_offset
+        
+        # Final screen coordinates
+        prompt_y = list_start_y + visual_row_index
+        prompt_x = col3_x + 2 
+
+        def redraw_func():
             self._draw_screen(c1, c2, c3)
-            self.stdscr.refresh()
-            key = self.stdscr.getch()
+
+        try:
+            # Pass prompt="" so it looks like typing is *in* the cell
+            # The get_selection_input will handle the dropdown/typing logic
+            name = utils.get_selection_input(self.stdscr, "", prompt_y, prompt_x, options, redraw_func)
             
-            if key == 24: # Ctrl+X (Exit)
-                self.is_inputting = False
-                curses.curs_set(0)
-                raise QuitApplication()
-            elif key == 27: # Esc (Cancel)
-                self.is_inputting = False
-                self.message = "Cancelled"
-                curses.curs_set(0)
-                return
-            elif key in (curses.KEY_ENTER, ord('\n')): # Enter (Confirm)
-                if self.input_buffer:
-                    self.character.set_initial_trait(category.lower() + 's', self.input_buffer, 0)
-                    self.message = f"Added {self.input_buffer}"
-                    self.message_color = theme.CLR_ACCENT()
-                self.is_inputting = False
-                curses.curs_set(0)
-                return
-            elif key in (curses.KEY_BACKSPACE, 127, 8):
-                self.input_buffer = self.input_buffer[:-1]
-            elif 32 <= key <= 126 and len(self.input_buffer) < 20:
-                self.input_buffer += chr(key)
+            if name:
+                self.character.set_initial_trait(category.lower() + 's', name, 0)
+                self.message = f"Added {name}"
+                self.message_color = theme.CLR_ACCENT()
+                
+        except utils.InputCancelled:
+            self.message = "Cancelled"
+        finally:
+            self.is_inputting = False
+            curses.curs_set(0)
+
+    def _handle_deletion(self, c1, c2, c3):
+        current_list = [c1, c2, c3][self.active_col]
+        if not current_list: return
+        
+        category, name = current_list[self.active_row]
+        
+        # Validation
+        if category not in ["Discipline", "Background"] or name == "System":
+            self.message = "Can only remove added Disciplines or Backgrounds."
+            self.message_color = theme.CLR_ERROR()
+            return
+
+        # Confirm delete
+        trait_data = self.character.get_trait_data(category, name)
+        refund = (trait_data['new'] - trait_data['base']) * FREEBIE_COSTS.get(category, 0)
+        
+        self.message = f"Delete {name}? (Refund: {refund}) Press 'y' to confirm."
+        self.message_color = theme.CLR_ACCENT()
+        self._draw_screen(c1, c2, c3)
+        self.stdscr.refresh()
+        
+        key = self.stdscr.getch()
+        if key in [ord('y'), ord('Y')]:
+            success, msg = self.character.remove_trait(category, name)
+            self.message = msg
+            self.message_color = theme.CLR_ACCENT()
+            # Move cursor up one to avoid landing on a potentially shifted index
+            if self.active_row > 0: self.active_row -= 1
+        else:
+            self.message = "Deletion cancelled."
 
     # --- [DRAWING] ---
     def _draw_screen(self, col1, col2, col3):

@@ -163,7 +163,7 @@ class VtMCharacter:
         if trait_name not in target_dict:
             return False, "Trait not found."
 
-        # Calculate Refund
+        # Calculate refund (Base + Dots)
         data = target_dict[trait_name]
         # Calculate how many dots were purchased (New - Base). 
         # For added traits, Base is usually 0, so it refunds everything.
