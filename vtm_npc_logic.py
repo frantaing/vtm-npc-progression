@@ -148,6 +148,33 @@ class VtMCharacter:
         
         return True, f"'{trait_name}' {action} to {target_value}. {points_label}: {abs(total_cost)} points"
 
+    def remove_trait(self, category_name: str, trait_name: str) -> Tuple[bool, str]:
+
+        """Removes a trait and refunds the points spent on it."""
+        
+        # Only allow removing Disciplines and Backgrounds for now
+        if category_name == "Discipline":
+            target_dict = self.disciplines
+        elif category_name == "Background":
+            target_dict = self.backgrounds
+        else:
+            return False, f"Cannot delete {category_name}s."
+
+        if trait_name not in target_dict:
+            return False, "Trait not found."
+
+        # Calculate refund (Base + Dots)
+        data = target_dict[trait_name]
+        # Calculate how many dots were purchased (New - Base). 
+        # For added traits, Base is usually 0, so it refunds everything.
+        dots_purchased = data['new'] - data['base']
+        cost_per_dot = FREEBIE_COSTS.get(category_name, 0)
+        refund = dots_purchased * cost_per_dot
+
+        self.spent_freebies -= refund
+        del target_dict[trait_name]
+        return True, f"Removed {trait_name}. Refunded {refund} points."
+
     def get_text_sheet(self) -> str:
 
         """Generates a plain text representation of the character sheet."""
