@@ -246,7 +246,7 @@ class MainView:
         
         # Final screen coordinates
         prompt_y = list_start_y + visual_row_index
-        prompt_x = col3_x + 2 
+        prompt_x = col3_x
 
         def redraw_func():
             self._draw_screen(c1, c2, c3)
@@ -388,24 +388,19 @@ class MainView:
             draw_x = start_x + 2
             max_text_w = width - 8
             
+            # --- In-place input rendering ---
             if is_selected:
                 style = theme.CLR_HIGHLIGHT()
-                
-                # --- In-place input rendering ---
-                if self.is_inputting:
-                    # Draw the input box logic: < Poten_ >
-                    # Note: append '_' to show the cursor position clearly
-                    display_str = f"{theme.SYM_SELECTED_L}{self.input_buffer}_{theme.SYM_SELECTED_R}"
+                # Draw the input box logic: < Poten_ >
+                # Note: append '_' to show the cursor position clearly
+                if cat == "System":
+                    text = f"[ {name} ]"
+                    val_str = ""
                 else:
-                    # Standard selected behavior
-                    if cat == "System":
-                        text = f"[ {name} ]"
-                        val_str = ""
-                    else:
-                        data = self.character.get_trait_data(cat, name)
-                        text = name
-                        val_str = f"[{data['new']}]"
-                    display_str = f"{theme.SYM_SELECTED_L}{text:<{max_text_w}}{val_str}{theme.SYM_SELECTED_R}"
+                    data = self.character.get_trait_data(cat, name)
+                    text = name
+                    val_str = f"[{data['new']}]"
+                display_str = f"{theme.SYM_SELECTED_L}{text:<{max_text_w}}{val_str}{theme.SYM_SELECTED_R}"
                 
                 self.stdscr.addstr(start_y + i, draw_x - 2, display_str, style)
             else:

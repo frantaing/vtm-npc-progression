@@ -117,23 +117,23 @@ def get_selection_input(stdscr, prompt: str, y: int, x: int, options: list, curr
         # Redraw background to prevent trails
         current_screen_func(*args, **kwargs)
         
-        # Draw Prompt
         stdscr.addstr(y, x, prompt, theme.CLR_ACCENT())
         
         # Clear the area where input goes
         stdscr.addstr(y, input_x_start, " " * 40)
         
-        # Draw Input Value
         if is_manual:
             curses.curs_set(1)
-            stdscr.addstr(y, input_x_start, manual_buffer, theme.CLR_HIGHLIGHT()) # Manual: WHITE -> GOLD (highlight)
-            stdscr.move(y, input_x_start + len(manual_buffer))
+            display_str = f"{theme.SYM_SELECTED_L}{manual_buffer}{theme.SYM_SELECTED_R}"
+            stdscr.addstr(y, input_x_start, display_str, theme.CLR_HIGHLIGHT())
+            # Move cursor to immediately after the text, but before the right bracket
+            stdscr.move(y, input_x_start + len(theme.SYM_SELECTED_L) + len(manual_buffer))
         else:
             curses.curs_set(0)
             current_opt = options[selection_index]
             # Draw as < Option >
             display_str = f"{theme.SYM_SELECTED_L}{current_opt}{theme.SYM_SELECTED_R}"
-            stdscr.addstr(y, input_x_start, display_str, theme.CLR_HIGHLIGHT())
+            stdscr.addstr(y, input_x_start, display_str, theme.CLR_HIGHLIGHT())        
 
         stdscr.refresh()
         key = stdscr.getch()
