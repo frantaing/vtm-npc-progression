@@ -54,6 +54,39 @@ def show_popup(stdscr, title: str, message: str, color_attr=None):
     stdscr.refresh()
     stdscr.getch()
 
+def show_confirmation_popup(stdscr, title: str, message: str, color_attr=None) -> bool:
+    """Displays a modal pop-up and waits for Y/N confirmation."""
+    if color_attr is None:
+        color_attr = theme.CLR_ERROR()
+    h, w = stdscr.getmaxyx()
+    
+    # Split message by newlines if manually added, then wrap
+    lines = []
+    for paragraph in message.split('\n'):
+        lines.extend(textwrap.wrap(paragraph, 40) if paragraph else [""])
+        
+    dialog_height = len(lines) + 4
+    dialog_width = 50
+    dialog_y = (h - dialog_height) // 2
+    dialog_x = (w - dialog_width) // 2
+    
+    draw_box(stdscr, dialog_y, dialog_x, dialog_height, dialog_width, title)
+    
+    for i, line in enumerate(lines):
+        stdscr.addstr(dialog_y + 2 + i, dialog_x + 2, line, color_attr)
+
+    controls = "[Y]es / [N]o"
+    stdscr.addstr(dialog_y + dialog_height - 2, dialog_x + (dialog_width - len(controls)) // 2, controls, theme.CLR_HIGHLIGHT())
+    
+    stdscr.refresh()
+    
+    while True:
+        key = stdscr.getch()
+        if key in [ord('y'), ord('Y'), 10]: # Yes or Enter
+            return True
+        elif key in [ord('n'), ord('N'), 27]: # No or Esc
+            return False
+
 # --- [INPUT HELPERS] ---
 class QuitApplication(Exception):
     pass
