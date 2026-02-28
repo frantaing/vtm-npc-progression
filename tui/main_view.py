@@ -274,29 +274,31 @@ class MainView:
         category, name = current_list[self.active_row]
         
         # Validation
-        if category not in ["Discipline", "Background"] or name == "System":
+        if category not in ["Discipline", "Background"] or name == "System" or category in ["Header", "Spacer"]:
             self.message = "Can only remove added Disciplines or Backgrounds."
             self.message_color = theme.CLR_ERROR()
             return
 
-        # Confirm delete
+        # Prepare Data
         trait_data = self.character.get_trait_data(category, name)
         refund = (trait_data['new'] - trait_data['base']) * FREEBIE_COSTS.get(category, 0)
         
-        self.message = f"Delete {name}? (Refund: {refund}) Press 'y' to confirm."
-        self.message_color = theme.CLR_ACCENT()
+        # Draw the screen first so the pop-up layers over it properly
         self._draw_screen(c1, c2, c3)
-        self.stdscr.refresh()
         
-        key = self.stdscr.getch()
-        if key in [ord('y'), ord('Y')]:
+        # Call the confirmation pop-up
+        msg = f"Are you sure you want to completely remove {name}?\n\nThis will refund {refund} Freebie Points."
+        confirm = utils.show_confirmation_popup(self.stdscr, "Confirm Deletion", msg, theme.CLR_ACCENT())
+        
+        if confirm:
             success, msg = self.character.remove_trait(category, name)
             self.message = msg
             self.message_color = theme.CLR_ACCENT()
-            # Move cursor up one to avoid landing on a potentially shifted index
+            # Move cursor up one to avoid landing on a potentially shifted index or out of bounds
             if self.active_row > 0: self.active_row -= 1
         else:
             self.message = "Deletion cancelled."
+            self.message_color = theme.CLR_TEXT()
 
     # --- [DRAWING] ---
     def _draw_screen(self, col1, col2, col3):
