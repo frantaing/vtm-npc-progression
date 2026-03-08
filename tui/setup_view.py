@@ -15,8 +15,24 @@ class SetupView:
         if not character:
             return None
         
-        self._setup_initial_traits(character)
+        if is_free_mode:
+            # Skip the wizard and just initialize everything to 0
+            self._fill_blank_traits(character)
+        else:
+            self._setup_initial_traits(character)
+            
         return character
+
+    def _fill_blank_traits(self, character: VtMCharacter):
+        """Silently populates the character with 0s for Free Mode."""
+        for attr in ATTRIBUTES_LIST:
+            character.set_initial_trait("attributes", attr, 0)
+            
+        for abil in ABILITIES_LIST:
+            character.set_initial_trait("abilities", abil, 0)
+            
+        for virt in VIRTUES_LIST:
+            character.set_initial_trait("virtues", virt, 0)
 
     def _setup_character(self, is_free_mode: bool) -> Optional[VtMCharacter]:
         # Convert CLAN_DATA keys to a sorted list for the menu
@@ -84,10 +100,11 @@ class SetupView:
         freebie_msg = "Freebie Points: Unlimited" if is_free_mode else f"Character created with {character.total_freebies} Freebie Points!"
         self.stdscr.addstr(list_y + 1, start_x + 2, freebie_msg, theme.CLR_ACCENT())
         
-        self.stdscr.addstr(list_y + 3, start_x + 2, "Press any key to set initial traits...", theme.CLR_BORDER())
+        prompt_msg = "Press any key to enter character sheet..." if is_free_mode else "Press any key to set initial traits..."
+        self.stdscr.addstr(list_y + 3, start_x + 2, prompt_msg, theme.CLR_BORDER())
+        
         self.stdscr.refresh()
         
-        # If Ctrl+X, quit
         key = self.stdscr.getch()
         if key == 24: raise utils.QuitApplication()
         
