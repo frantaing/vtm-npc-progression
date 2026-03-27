@@ -5,6 +5,7 @@ from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
 from vtm_data import CLAN_DATA
+from .utils import QuitApplication, safe_input
 
 class SetupView:
     def __init__(self, stdscr):
@@ -35,9 +36,8 @@ class SetupView:
             character.set_initial_trait("virtues", virt, 0)
 
     def _setup_character(self, is_free_mode: bool) -> Optional[VtMCharacter]:
-        # Convert CLAN_DATA keys to a sorted list for the menu
         clan_list = sorted(list(CLAN_DATA.keys()))
-        
+
         prompts = [
             ("Character Name", None, None, None),
             ("Clan", clan_list, None, None),
@@ -56,38 +56,29 @@ class SetupView:
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Character Setup")
             list_y = start_y + 2
             for info_label, info_value in entered_info.items():
-                # Label -> RED!
                 self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: ", theme.CLR_ACCENT())
-                # Conf value -> WHITE!
                 self.stdscr.addstr(list_y, start_x + 2 + len(info_label) + 2, f"{info_value}", theme.CLR_TEXT())
                 list_y += 1
             return start_y, start_x, list_y
 
         for label, option_list, min_val, max_val in prompts:
-            value = None
-            while value is None:
-                start_y, start_x, list_y = draw_setup_screen()
-                try:
-                    # Check which input method to use
-                    if min_val is not None:
-                        value = utils.get_number_input(self.stdscr, f"{label}: ", list_y, start_x + 2, min_val, max_val, draw_setup_screen)
-                    elif option_list is not None:
-                        # Use the Hybrid Selection (see utils.py)
-                        value = utils.get_selection_input(self.stdscr, f"{label}: ", list_y, start_x + 2, option_list, draw_setup_screen)
-                    else:
-                        value = utils.get_string_input(self.stdscr, f"{label}: ", list_y, start_x + 2, draw_setup_screen)
-                except utils.InputCancelled:
-                    # Mandatory field: Ignore Esc and re-prompt
-                    continue
-            
+            start_y, start_x, list_y = draw_setup_screen()
+
+            if min_val is not None:
+                value = safe_input(utils.get_number_input, self.stdscr, f"{label}: ", list_y, start_x + 2, min_val, max_val, draw_setup_screen)
+            elif option_list is not None:
+                value = safe_input(utils.get_selection_input, self.stdscr, f"{label}: ", list_y, start_x + 2, option_list, draw_setup_screen)
+            else:
+                value = safe_input(utils.get_string_input, self.stdscr, f"{label}: ", list_y, start_x + 2, draw_setup_screen)
+
             entered_info[label] = value
-        
+
         character = VtMCharacter(
-            entered_info["Character Name"], entered_info["Clan"], 
+            entered_info["Character Name"], entered_info["Clan"],
             entered_info["Age (0-5600+)"], entered_info["Generation (2-16)"],
             is_free_mode=is_free_mode
         )
-        
+
         h, w = self.stdscr.getmaxyx()
         container_width, container_height = 70, 18
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
@@ -96,18 +87,17 @@ class SetupView:
         list_y = start_y + 2
         for info_label, info_value in entered_info.items():
             self.stdscr.addstr(list_y, start_x + 2, f"{info_label}: {info_value}", theme.CLR_ACCENT()); list_y += 1
-        
+
         freebie_msg = "Freebie Points: Unlimited" if is_free_mode else f"Character created with {character.total_freebies} Freebie Points!"
         self.stdscr.addstr(list_y + 1, start_x + 2, freebie_msg, theme.CLR_ACCENT())
-        
+
         prompt_msg = "Press any key to enter character sheet..." if is_free_mode else "Press any key to set initial traits..."
         self.stdscr.addstr(list_y + 3, start_x + 2, prompt_msg, theme.CLR_BORDER())
-        
+
         self.stdscr.refresh()
-        
         key = self.stdscr.getch()
         if key == 24: raise utils.QuitApplication()
-        
+
         return character
 
     def _setup_initial_traits(self, character: VtMCharacter):
