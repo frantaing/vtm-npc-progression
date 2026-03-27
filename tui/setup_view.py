@@ -2,10 +2,10 @@
 import curses
 from typing import Dict, Any, Optional
 from . import utils
+from .utils import QuitApplication, safe_input, InputCancelled
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
 from vtm_data import CLAN_DATA
-from .utils import QuitApplication, safe_input
 
 class SetupView:
     def __init__(self, stdscr):
@@ -101,7 +101,7 @@ class SetupView:
         return character
 
     def _setup_initial_traits(self, character: VtMCharacter):
-        
+
         def run_setup_loop(title_text, item_list, min_val, max_val, is_freeform=False):
             entered_items: Dict[str, Any] = {}
 
