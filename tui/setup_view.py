@@ -104,24 +104,23 @@ class SetupView:
         
         def run_setup_loop(title_text, item_list, min_val, max_val, is_freeform=False):
             entered_items: Dict[str, Any] = {}
-            
+
             def draw_loop_screen(current_item_name=None):
                 h, w = self.stdscr.getmaxyx()
                 self.stdscr.erase()
-                container_width, container_height = 60, min(40, h-4)
+                container_width, container_height = 60, min(40, h - 4)
                 start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
                 utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, title_text)
                 self.stdscr.addstr(start_y + 2, start_x + 2, f"Set initial values ({min_val}-{max_val})", theme.CLR_BORDER())
-                if is_freeform: self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' or Press Esc to finish.", theme.CLR_BORDER())
+                if is_freeform:
+                    self.stdscr.addstr(start_y + 3, start_x + 2, "Type 'done' or Press Esc to finish.", theme.CLR_BORDER())
 
                 list_y = start_y + 5
                 max_display = container_height - 9
                 start_idx = max(0, len(entered_items) - max_display + 1)
                 for name, value in list(entered_items.items())[start_idx:]:
-                    if list_y >= start_y + container_height - 3: break                        
-                    # Draw label in Red
+                    if list_y >= start_y + container_height - 3: break
                     self.stdscr.addstr(list_y, start_x + 2, f"{name}: ", theme.CLR_ACCENT())
-                    # Draw confirmed value in White
                     self.stdscr.addstr(list_y, start_x + 2 + len(name) + 2, f"{value}", theme.CLR_TEXT())
                     list_y += 1
                 if current_item_name:
@@ -134,40 +133,29 @@ class SetupView:
                     try:
                         item_name = utils.get_string_input(self.stdscr, f"{title_text[:-1]} Name: ", list_y, start_x + 2, draw_loop_screen)
                     except utils.InputCancelled:
-                        break # Esc in freeform name entry means "I'm done adding items"
-                    
-                    if item_name.lower() == 'done': break
-                    
-                    val = None
-                    while val is None:
-                        try:
-                            val = utils.get_number_input(self.stdscr, "  Value: ", list_y + 1, start_x + 2, min_val, max_val, draw_loop_screen, current_item_name=item_name)
-                        except utils.InputCancelled:
-                            # If user cancels value entry, just re-prompt for the value 
-                            continue 
-                    
+                        break  # Esc in freeform = done adding items
+
+                    if item_name.lower() == 'done':
+                        break
+
+                    val = safe_input(utils.get_number_input, self.stdscr, "  Value: ", list_y + 1, start_x + 2, min_val, max_val, draw_loop_screen, current_item_name=item_name)
                     entered_items[item_name] = val
                     character.set_initial_trait(title_text.lower(), item_name, val)
             else:
                 for item in item_list:
-                    val = None
-                    while val is None:
-                        try:
-                            val = utils.get_number_input(self.stdscr, f"{item}: ", draw_loop_screen()[2], draw_loop_screen()[1] + 2, min_val, max_val, draw_loop_screen)
-                        except utils.InputCancelled:
-                            # Mandatory list item: Ignore Esc and re-prompt
-                            continue
+                    _, start_x, list_y = draw_loop_screen()
+                    val = safe_input(utils.get_number_input, self.stdscr, f"{item}: ", list_y, start_x + 2, min_val, max_val, draw_loop_screen)
                     entered_items[item] = val
                     character.set_initial_trait(title_text.lower(), item, val)
+
             return entered_items
 
-        # --- NOTE: Removed the Disciplines and Backgrounds loops ---
         run_setup_loop("Attributes", ATTRIBUTES_LIST, 1, 10)
         run_setup_loop("Abilities", ABILITIES_LIST, 0, 10)
-        
+
         entered_virtues: Dict[str, Any] = {}
-        humanity: Optional[int] = None
-        willpower: Optional[int] = None
+        humanity = None
+        willpower = None
 
         def draw_virtues_screen():
             h, w = self.stdscr.getmaxyx()
@@ -176,9 +164,8 @@ class SetupView:
             start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Virtues & Path")
             self.stdscr.addstr(start_y + 2, start_x + 2, "Set initial values (1-10)", theme.CLR_BORDER())
-            
-            list_y = start_y + 4 # Labels -> RED; Conf input -> WHITE
-            for name, value in entered_virtues.items(): # 
+            list_y = start_y + 4
+            for name, value in entered_virtues.items():
                 self.stdscr.addstr(list_y, start_x + 2, f"{name}: ", theme.CLR_ACCENT())
                 self.stdscr.addstr(list_y, start_x + 2 + len(name) + 2, f"{value}", theme.CLR_TEXT())
                 list_y += 1
@@ -193,25 +180,15 @@ class SetupView:
             return start_y, start_x, list_y
 
         for virtue in VIRTUES_LIST:
-            val = None
-            while val is None:
-                try:
-                    val = utils.get_number_input(self.stdscr, f"{virtue}: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
-                except utils.InputCancelled:
-                    continue
+            _, start_x, list_y = draw_virtues_screen()
+            val = safe_input(utils.get_number_input, self.stdscr, f"{virtue}: ", list_y, start_x + 2, 1, 10, draw_virtues_screen)
             entered_virtues[virtue] = val
             character.set_initial_trait("virtues", virtue, val)
-        
-        while humanity is None:
-            try:
-                humanity = utils.get_number_input(self.stdscr, "Humanity/Path: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
-            except utils.InputCancelled:
-                continue
+
+        _, start_x, list_y = draw_virtues_screen()
+        humanity = safe_input(utils.get_number_input, self.stdscr, "Humanity/Path: ", list_y, start_x + 2, 1, 10, draw_virtues_screen)
         character.set_initial_value("humanity", humanity)
 
-        while willpower is None:
-            try:
-                willpower = utils.get_number_input(self.stdscr, "Willpower: ", draw_virtues_screen()[2], draw_virtues_screen()[1] + 2, 1, 10, draw_virtues_screen)
-            except utils.InputCancelled:
-                continue
+        _, start_x, list_y = draw_virtues_screen()
+        willpower = safe_input(utils.get_number_input, self.stdscr, "Willpower: ", list_y, start_x + 2, 1, 10, draw_virtues_screen)
         character.set_initial_value("willpower", willpower)
