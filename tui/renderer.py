@@ -83,7 +83,7 @@ def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col
         if idx >= len(items):
             break
 
-        cat, name = items[idx]
+        cat, name = items[idx][0], items[idx][1]
         row_y = start_y + i
 
         if cat == "Spacer":
