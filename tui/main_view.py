@@ -21,10 +21,6 @@ class MainView:
         
         # To track list sizes for boundary checking
         self.col_counts = [0, 0, 0]
-        
-        # Input State (for in-place editing Disciplines/Backgrounds)
-        self.is_inputting = False
-        self.input_buffer = ""
 
     def run(self):
         """Main interaction loop using direct navigation."""
@@ -113,12 +109,10 @@ class MainView:
             self.active_row = new_row
 
     def _get_col1_items(self) -> List[Tuple[str, str]]:
-        # Added Header to list for auto-centering/alignment
         return [("Header", "ATTRIBUTES")] + [("Attribute", attr) for attr in ATTRIBUTES_LIST]
 
     def _get_col2_items(self) -> List[Tuple[str, str]]:
         # List ALL abilities so user can buy them from 0
-        # Added Header to list for auto-centering/alignment
         return [("Header", "ABILITIES")] + [("Ability", abil) for abil in ABILITIES_LIST]
 
     def _get_col3_items(self) -> List[Tuple[str, str]]:
@@ -203,7 +197,6 @@ class MainView:
             self._add_new_trait(new_cat, c1, c2, c3)
 
     def _add_new_trait(self, category, c1, c2, c3):
-        self.is_inputting = True
         curses.curs_set(1)
         
         # Prepare the list (exclude existing traits)
@@ -265,7 +258,6 @@ class MainView:
         except utils.InputCancelled:
             self.message = "Cancelled"
         finally:
-            self.is_inputting = False
             curses.curs_set(0)
 
     def _handle_deletion(self, c1, c2, c3):
