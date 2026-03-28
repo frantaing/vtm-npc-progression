@@ -158,7 +158,7 @@ def draw_character_sheet_columns(stdscr, character, col1_items: list, col2_items
 
     # Draw vertical separators
     sep_start = start_y
-    sep_end = container_start_y + container_height - 1
+    sep_end = container_start_y + container_height - 2
     for i in range(sep_start, sep_end):
         stdscr.addstr(i, cx2 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
         stdscr.addstr(i, cx3 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
