@@ -3,6 +3,7 @@ import curses
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter
+from .renderer import draw_character_sheet_columns
 
 class FinalView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -36,47 +37,51 @@ class FinalView:
             
             # --- [3-Column Layout] ---
             col_width = (container_width - 6) // 3
-            start_draw_y, max_draw_y = sheet_y, start_y + container_height - 3
-            col1_x = sheet_x
-            col2_x = sheet_x + col_width + 2
-            col3_x = sheet_x + (col_width * 2) + 4
+            cx1 = sheet_x
+            cx2 = sheet_x + col_width + 2
+            cx3 = sheet_x + (col_width * 2) + 4
+            content_y = sheet_y
 
-            # Draw Vertical Separators
-            for i in range(max_draw_y - start_draw_y - 1):
-                self.stdscr.addstr(start_draw_y + i, col1_x + col_width, theme.SYM_BORDER_V, theme.CLR_BORDER())
-                self.stdscr.addstr(start_draw_y + i, col2_x + col_width, theme.SYM_BORDER_V, theme.CLR_BORDER())
+            # Build item lists (same structure as MainView)
+            from vtm_npc_logic import ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
 
-            # --- [Column 1: ATTRIBUTES] ---
-            y_c1 = start_draw_y
-            self.stdscr.addstr(y_c1, col1_x, f"{theme.SYM_HEADER_L}ATTRIBUTES{theme.SYM_HEADER_R}"[:col_width], theme.CLR_ACCENT()); y_c1 += 1
-            for n, d in self.character.attributes.items():
-                if y_c1 >= max_draw_y: break
-                self._display_trait(y_c1, col1_x, n, d, col_width); y_c1 += 1
+            col1_items = [("Header", "ATTRIBUTES")] + [("Attribute", a) for a in ATTRIBUTES_LIST]
+            col2_items = [("Header", "ABILITIES")] + [("Ability", a) for a in ABILITIES_LIST]
 
-            # --- [Column 2: ABILITIES] ---
-            y_c2 = start_draw_y
-            self.stdscr.addstr(y_c2, col2_x + 2, f"{theme.SYM_HEADER_L}ABILITIES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c2 += 1
-            for n, d in [(n, d) for n, d in self.character.abilities.items() if d['new'] > 0]:
-                if y_c2 >= max_draw_y: break
-                self._display_trait(y_c2, col2_x + 2, n, d, col_width - 2); y_c2 += 1
+            col3_items = []
+            col3_items.append(("Header", "DISCIPLINES"))
+            for disc in self.character.disciplines:
+                col3_items.append(("Discipline", disc))
+            col3_items.append(("Spacer", ""))
+            col3_items.append(("Header", "BACKGROUNDS"))
+            for bg in self.character.backgrounds:
+                col3_items.append(("Background", bg))
+            col3_items.append(("Spacer", ""))
+            col3_items.append(("Header", "VIRTUES"))
+            for virt in VIRTUES_LIST:
+                col3_items.append(("Virtue", virt))
+            col3_items.append(("Spacer", ""))
+            col3_items.append(("Header", "PATH/WILLPOWER"))
+            col3_items.append(("Humanity", "Humanity/Path"))
+            col3_items.append(("Willpower", "Willpower"))
 
-            # --- [Column 3: EVERYTHING ELSE] ---
-            y_c3 = start_draw_y
-            for cat in ["disciplines", "backgrounds"]:
-                if getattr(self.character, cat) and y_c3 < max_draw_y:
-                    self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}{cat.upper()}{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
-                    for n, d in getattr(self.character, cat).items():
-                        if y_c3 >= max_draw_y: break
-                        self._display_trait(y_c3, col3_x + 2, n, d, col_width - 2); y_c3 += 1
-                    y_c3 += 1
-            
-            if y_c3 < max_draw_y:
-                self.stdscr.addstr(y_c3, col3_x + 2, f"{theme.SYM_HEADER_L}VIRTUES{theme.SYM_HEADER_R}"[:col_width - 2], theme.CLR_ACCENT()); y_c3 += 1
-                for n, d in self.character.virtues.items():
-                    if y_c3 >= max_draw_y: break
-                    self._display_trait(y_c3, col3_x + 2, n, d, col_width - 2); y_c3 += 1
-                if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x + 2, "Humanity", self.character.humanity, col_width - 2); y_c3 += 1
-                if y_c3 < max_draw_y: self._display_trait(y_c3, col3_x + 2, "Willpower", self.character.willpower, col_width - 2)
+            layout = {
+                "start_y":           content_y,
+                "cx1":               cx1,
+                "cx2":               cx2,
+                "cx3":               cx3,
+                "col_width":         col_width,
+                "max_rows":          container_height - 8,
+                "container_height":  container_height,
+                "container_start_y": start_y,
+            }
+
+            draw_character_sheet_columns(
+                self.stdscr, self.character,
+                col1_items, col2_items, col3_items,
+                layout,
+                is_interactive=False
+            )
             
             # --- [EXPORT PROMPT] ---
             controls = "E: Export to Text | Any other key: Exit"
@@ -118,13 +123,3 @@ class FinalView:
             utils.show_popup(self.stdscr, "Success", f"Character saved to {filename}", theme.CLR_ACCENT())
         except Exception as e:
             utils.show_popup(self.stdscr, "Error", f"Failed to save: {str(e)}", theme.CLR_ERROR())
-
-    def _display_trait(self, y: int, x: int, name: str, data: Dict, width: int):
-        max_name_len = width - 9
-        name_part = f"{name[:max_name_len]:<{max_name_len}}"
-        if data['base'] == data['new']:
-            trait_str = f"{name_part} [{data['new']}]"
-            self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_TEXT())
-        else:
-            trait_str = f"{name_part} [{data['base']}]→[{data['new']}]"
-            self.stdscr.addstr(y, x, trait_str[:width], theme.CLR_ACCENT())
