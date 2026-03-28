@@ -207,3 +207,19 @@ def get_selection_input(stdscr, prompt: str, y: int, x: int, options: list, curr
             
             if len(manual_buffer) < 30:
                 manual_buffer += chr(key)
+
+def safe_input(prompt_fn, *args, **kwargs):
+    """
+    Wraps any input function in a retry loop, handling InputCancelled silently.
+    Keeps retrying until the prompt_fn returns a non-None value.
+    
+    Usage:
+        value = safe_input(get_number_input, stdscr, "Age: ", y, x, 0, 9999, redraw)
+    """
+    while True:
+        try:
+            result = prompt_fn(*args, **kwargs)
+            if result is not None:
+                return result
+        except InputCancelled:
+            continue
