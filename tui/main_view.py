@@ -5,6 +5,7 @@ from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS, DISCIPLINES_LIST, BACKGROUNDS_LIST
 from .utils import QuitApplication
+from .renderer import draw_character_sheet_columns
 
 class MainView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -304,20 +305,19 @@ class MainView:
     def _draw_screen(self, col1, col2, col3):
         h, w = self.stdscr.getmaxyx()
         self.stdscr.erase()
-        
-        # Maximized width
+
         container_width = min(130, w - 2)
         container_height = min(50, h - 2)
         start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-        
+
         utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "VTM NPC Progression Tool")
-        
-        # Header Info
+
+        # Header info
         header_y = start_y + 1
         info_str = f"{self.character.name} ({self.character.clan}) | Age: {self.character.age} | Gen: {self.character.generation}th"
         self.stdscr.addstr(header_y, start_x + 2, info_str, theme.CLR_TITLE())
-        
-        # Freebie Points
+
+        # Freebie points
         header_y += 1
         if self.character.is_free_mode:
             spent_str = f"Freebie Points Spent: {self.character.spent_freebies}"
@@ -328,40 +328,39 @@ class MainView:
             color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
         self.stdscr.addstr(header_y, start_x + 2, spent_str, color)
 
-        # 3-Column Calculations
+        # Layout calculations
         col_width = (container_width - 4) // 3
         cx1 = start_x + 2
         cx2 = cx1 + col_width + 1
         cx3 = cx2 + col_width + 1
-        
         content_y = header_y + 2
-        
-        # ---------------------------------------------------------------------------------
-        # ! Headers removed from here because they are now part of the data lists.
-        # This makes sure they scroll and align exactly like the rest of the content.
-        # ---------------------------------------------------------------------------------
-        
-        # Draw Separators
-        for i in range(content_y + 1, start_y + container_height - 1):
-            self.stdscr.addstr(i, cx2 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
-            self.stdscr.addstr(i, cx3 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
 
-        # Draw columns
-        # ! Start list drawing immediately at content_y
-        list_start_y = content_y
-        max_rows = container_height - 7
-        
-        self._draw_column(list_start_y, cx1, col_width, col1, 0, max_rows)
-        self._draw_column(list_start_y, cx2, col_width, col2, 1, max_rows)
-        self._draw_column(list_start_y, cx3, col_width, col3, 2, max_rows)
+        layout = {
+            "start_y":           content_y,
+            "cx1":               cx1,
+            "cx2":               cx2,
+            "cx3":               cx3,
+            "col_width":         col_width,
+            "max_rows":          container_height - 7,
+            "container_height":  container_height,
+            "container_start_y": start_y,
+        }
+
+        draw_character_sheet_columns(
+            self.stdscr, self.character,
+            col1, col2, col3,
+            layout,
+            active_col=self.active_col,
+            active_row=self.active_row,
+            is_interactive=True
+        )
 
         # Footer
         if self.message:
             utils.draw_wrapped_text(self.stdscr, start_y + container_height - 2, start_x + 2, self.message, container_width - 4, self.message_color)
         else:
-            # Controls
             controls = "Arrows/0-9: Modify | Space: Next Col | Enter: Add/Select | Ctrl+X: Done"
-            self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls))//2, controls, theme.CLR_ACCENT())
+            self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls)) // 2, controls, theme.CLR_ACCENT())
 
     def _draw_column(self, start_y, start_x, width, items, col_idx, max_rows):
         # Calculate scroll offset
