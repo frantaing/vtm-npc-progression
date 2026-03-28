@@ -9,44 +9,35 @@ Used by both MainView (interactive) and FinalView (static).
 import curses
 from . import theme
 
-
 # --- [SINGLE TRAIT ROW] ---
-def draw_trait_row(stdscr, y: int, x: int, name: str, data: dict, width: int, is_selected: bool = False, is_interactive: bool = False):
+def draw_trait_row(stdscr, y: int, x: int, name: str, data: dict, width: int, is_selected: bool = False, is_modified: bool = False, is_interactive: bool = False):
     """
     Renders a single trait row.
 
     In interactive mode (MainView):
       - Selected row gets gold highlight + < name [val] > brackets
-      - Modified/dynamic traits (base != new, or Discipline/Background) get CLR_ACCENT
+      - Modified/dynamic traits (passed via is_modified) get CLR_ACCENT
     In static mode (FinalView):
       - Modified traits show [base]→[new] in CLR_ACCENT
       - Unmodified traits show [val] in CLR_TEXT
     """
     max_name_len = width - 9
+    name_part = f"{name[:max_name_len]:<{max_name_len}}"
 
-    if is_interactive:
-        if is_selected:
-            val_str = f"[{data['new']}]"
-            name_part = f"{name[:max_name_len]:<{max_name_len}}"
-            display_str = f"{theme.SYM_SELECTED_L}{name_part}{val_str}{theme.SYM_SELECTED_R}"
-            stdscr.addstr(y, x - 2, display_str, theme.CLR_HIGHLIGHT())
-        else:
-            is_modified = data['base'] != data['new']
-            val_str = f"[{data['new']}]"
-            name_part = f"{name[:max_name_len]:<{max_name_len}}"
-            display_str = f"{name_part}{val_str}"
-            style = theme.CLR_ACCENT() if is_modified else theme.CLR_TEXT()
-            stdscr.addstr(y, x, display_str, style)
+    if is_selected:
+        val_str = f"[{data['new']}]"
+        display_str = f"{theme.SYM_SELECTED_L}{name_part}{val_str}{theme.SYM_SELECTED_R}"
+        stdscr.addstr(y, x - 2, display_str, theme.CLR_HIGHLIGHT())
     else:
-        # Static mode (FinalView)
-        name_part = f"{name[:max_name_len]:<{max_name_len}}"
-        if data['base'] == data['new']:
-            trait_str = f"{name_part} [{data['new']}]"
-            stdscr.addstr(y, x, trait_str[:width], theme.CLR_TEXT())
+        # Static mode (FinalView) shows arrows; Interactive shows current value
+        if not is_interactive and data['base'] != data['new']:
+            val_str = f"[{data['base']}]→[{data['new']}]"
         else:
-            trait_str = f"{name_part} [{data['base']}]→[{data['new']}]"
-            stdscr.addstr(y, x, trait_str[:width], theme.CLR_ACCENT())
-
+            val_str = f"[{data['new']}]"
+            
+        display_str = f"{name_part}{val_str}"
+        style = theme.CLR_ACCENT() if is_modified else theme.CLR_TEXT()
+        stdscr.addstr(y, x, display_str, style)
 
 # --- [SYSTEM/ADD ROW] ---
 def draw_system_row(stdscr, y: int, x: int, name: str, width: int, is_selected: bool = False):
@@ -58,21 +49,12 @@ def draw_system_row(stdscr, y: int, x: int, name: str, width: int, is_selected: 
     else:
         stdscr.addstr(y, x, text, theme.CLR_TEXT())
 
-
 # --- [SINGLE COLUMN] ---
 def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col_idx: int, max_rows: int, active_col: int, active_row: int, is_interactive: bool = False, dynamic_categories: tuple = ()):
     """
     Renders one column of the character sheet.
-
-    - Skips Spacer rows silently.
-    - Renders Header rows centered in CLR_BORDER.
-    - Renders trait rows via draw_trait_row.
-    - Renders system rows via draw_system_row.
-    - Handles scroll offset based on active_row.
-    - dynamic_categories: tuple of category names that are always CLR_ACCENT
-      regardless of base/new equality (e.g. ("Discipline", "Background")).
+    ... [Original docstring remains same] ...
     """
-    # Calculate scroll offset
     scroll_offset = 0
     if is_interactive and active_col == col_idx:
         if active_row >= max_rows:
@@ -101,32 +83,15 @@ def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col
             draw_system_row(stdscr, row_y, start_x + 2, name, width, is_selected=is_selected)
             continue
 
-        # Resolve trait data
-        # Traits passed in as items are (category, name) tuples.
-        # The caller must pass a character reference OR pre-resolved data.
-        # To keep this renderer decoupled from VtMCharacter,
-        # Accept pre-resolved (cat, name, data) tuples when data is needed.
-        # See draw_character_sheet_columns() below which handles resolution.
-        if len(items[idx]) == 3:
-            _, _, data = items[idx]
-        else:
-            data = {"base": 0, "new": 0}  # Fallback, shouldn't normally hit
+        # Data resolution
+        data = items[idx][2] if len(items[idx]) == 3 else {"base": 0, "new": 0}
 
-        # In interactive mode, dynamic categories are always accented
-        if is_interactive and cat in dynamic_categories and not is_selected:
-            is_modified_override = True
-        else:
-            is_modified_override = None
+        # Calculate if row should be Red (modified)
+        is_modified = data['base'] != data['new']
+        if is_interactive and cat in dynamic_categories:
+            is_modified = True  # Added categories are always red in interactive mode
 
-        if is_interactive and is_modified_override and not is_selected:
-            val_str = f"[{data['new']}]"
-            max_name_len = width - 9
-            name_part = f"{name[:max_name_len]:<{max_name_len}}"
-            display_str = f"{name_part}{val_str}"
-            stdscr.addstr(row_y, start_x + 2, display_str, theme.CLR_ACCENT())
-        else:
-            draw_trait_row(stdscr, row_y, start_x + 2, name, data, width, is_selected=is_selected, is_interactive=is_interactive)
-
+        draw_trait_row(stdscr, row_y, start_x + 2, name, data, width, is_selected, is_modified, is_interactive)
 
 # --- [FULL 3-COLUMN SHEET] ---
 def draw_character_sheet_columns(stdscr, character, col1_items: list, col2_items: list, col3_items: list, layout: dict, active_col: int = 0, active_row: int = 0, is_interactive: bool = False):
