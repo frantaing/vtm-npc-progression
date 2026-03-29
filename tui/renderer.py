@@ -1,0 +1,151 @@
+"""
+tui/renderer.py
+
+Shared rendering logic for the 3-column character sheet body.
+Used by both MainView (interactive) and FinalView (static).
+"""
+
+# --- [IMPORTS] ---
+import curses
+from . import theme
+
+# --- [SINGLE TRAIT ROW] ---
+def draw_trait_row(stdscr, y: int, x: int, name: str, data: dict, width: int, is_selected: bool = False, is_modified: bool = False, is_interactive: bool = False):
+    """
+    Renders a single trait row.
+
+    In interactive mode (MainView):
+      - Selected row gets gold highlight + < name [val] > brackets
+      - Modified/dynamic traits (passed via is_modified) get CLR_ACCENT
+    In static mode (FinalView):
+      - Modified traits show [base]→[new] in CLR_ACCENT
+      - Unmodified traits show [val] in CLR_TEXT
+    """
+    max_name_len = width - 9
+    name_part = f"{name[:max_name_len]:<{max_name_len}}"
+
+    if is_selected:
+        val_str = f"[{data['new']}]"
+        display_str = f"{theme.SYM_SELECTED_L}{name_part}{val_str}{theme.SYM_SELECTED_R}"
+        stdscr.addstr(y, x - 2, display_str, theme.CLR_HIGHLIGHT())
+    else:
+        # Static mode (FinalView) shows arrows; Interactive shows current value
+        if not is_interactive and data['base'] != data['new']:
+            val_str = f"[{data['base']}]→[{data['new']}]"
+        else:
+            val_str = f"[{data['new']}]"
+            
+        display_str = f"{name_part}{val_str}"
+        style = theme.CLR_ACCENT() if is_modified else theme.CLR_TEXT()
+        stdscr.addstr(y, x, display_str, style)
+
+# --- [SYSTEM/ADD ROW] ---
+def draw_system_row(stdscr, y: int, x: int, name: str, width: int, is_selected: bool = False):
+    """Renders an 'Add Discipline' / 'Add Background' action row."""
+    text = f"[ {name} ]"
+    if is_selected:
+        display_str = f"{theme.SYM_SELECTED_L}{text:<{width - 4}}{theme.SYM_SELECTED_R}"
+        stdscr.addstr(y, x - 2, display_str, theme.CLR_HIGHLIGHT())
+    else:
+        stdscr.addstr(y, x, text, theme.CLR_TEXT())
+
+# --- [SINGLE COLUMN] ---
+def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col_idx: int, max_rows: int, active_col: int, active_row: int, is_interactive: bool = False, dynamic_categories: tuple = ()):
+    """
+    Renders one column of the character sheet.
+    ... [Original docstring remains same] ...
+    """
+    scroll_offset = 0
+    if is_interactive and active_col == col_idx:
+        if active_row >= max_rows:
+            scroll_offset = active_row - max_rows + 1
+
+    for i in range(max_rows):
+        idx = scroll_offset + i
+        if idx >= len(items):
+            break
+
+        cat, name = items[idx][0], items[idx][1]
+        row_y = start_y + i
+
+        if cat == "Spacer":
+            continue
+
+        if cat == "Header":
+            header_text = f"{theme.SYM_HEADER_L}{name}{theme.SYM_HEADER_R}"
+            pad = (width - len(header_text)) // 2
+            stdscr.addstr(row_y, start_x + max(0, pad), header_text[:width], theme.CLR_BORDER())
+            continue
+
+        is_selected = is_interactive and (active_col == col_idx) and (active_row == idx)
+
+        if cat == "System":
+            draw_system_row(stdscr, row_y, start_x + 2, name, width, is_selected=is_selected)
+            continue
+
+        # Data resolution
+        data = items[idx][2] if len(items[idx]) == 3 else {"base": 0, "new": 0}
+
+        # Calculate if row should be Red (modified)
+        is_modified = data['base'] != data['new']
+        if is_interactive and cat in dynamic_categories:
+            is_modified = True  # Added categories are always red in interactive mode
+
+        draw_trait_row(stdscr, row_y, start_x + 2, name, data, width, is_selected, is_modified, is_interactive)
+
+# --- [FULL 3-COLUMN SHEET] ---
+def draw_character_sheet_columns(stdscr, character, col1_items: list, col2_items: list, col3_items: list, layout: dict, active_col: int = 0, active_row: int = 0, is_interactive: bool = False):
+    """
+    Draws the full 3-column character sheet body.
+
+    layout dict expects:
+        {
+            "start_y":          int,  # top of content area
+            "cx1":              int,  # x start of col 1
+            "cx2":              int,  # x start of col 2
+            "cx3":              int,  # x start of col 3
+            "col_width":        int,  # width of each column
+            "max_rows":         int,  # max visible rows
+            "container_height": int,  # full container height
+            "container_start_y":int,  # top of container box
+        }
+
+    Resolves trait data from character before passing to draw_column.
+    """
+    start_y         = layout["start_y"]
+    cx1             = layout["cx1"]
+    cx2             = layout["cx2"]
+    cx3             = layout["cx3"]
+    col_width       = layout["col_width"]
+    max_rows        = layout["max_rows"]
+    container_height = layout["container_height"]
+    container_start_y = layout["container_start_y"]
+
+    # Draw vertical separators
+    sep_start = start_y
+    sep_end = container_start_y + container_height - 2
+    for i in range(sep_start, sep_end):
+        stdscr.addstr(i, cx2 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
+        stdscr.addstr(i, cx3 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
+
+    # Resolve data into (cat, name, data) triples
+    def resolve(items):
+        resolved = []
+        for item in items:
+            cat, name = item
+            if cat in ("Header", "Spacer", "System"):
+                resolved.append((cat, name, {}))
+            else:
+                data = character.get_trait_data(cat, name)
+                resolved.append((cat, name, data))
+        return resolved
+
+    r1 = resolve(col1_items)
+    r2 = resolve(col2_items)
+    r3 = resolve(col3_items)
+
+    dynamic = ("Discipline", "Background")
+
+    draw_column(stdscr, start_y, cx1, col_width, r1, 0, max_rows, active_col, active_row, is_interactive, dynamic)
+    draw_column(stdscr, start_y, cx2, col_width, r2, 1, max_rows, active_col, active_row, is_interactive, dynamic)
+    draw_column(stdscr, start_y, cx3, col_width, r3, 2, max_rows, active_col, active_row, is_interactive, dynamic)
