@@ -93,6 +93,54 @@ def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col
 
         draw_trait_row(stdscr, row_y, start_x + 2, name, data, width, is_selected, is_modified, is_interactive)
 
+# --- [CONTAINER + HEADER] ---
+def draw_sheet_container(stdscr, character, title: str, freebie_str: str, freebie_color, container_width: int, container_height: int) -> dict:
+    """
+    Draws the outer box, character header block, and freebie line.
+    Returns a layout dict ready to pass to draw_character_sheet_columns().
+
+    Caller is responsible for formatting freebie_str and freebie_color.
+    """
+    h, w = stdscr.getmaxyx()
+    start_x = (w - container_width) // 2
+    start_y = (h - container_height) // 2
+
+    utils.draw_box(stdscr, start_y, start_x, container_height, container_width, title)
+
+    # Line 1: Name + Clan
+    header_y = start_y + 1
+    name_str = f"{character.name} ({character.clan})"
+    stdscr.addstr(header_y, start_x + 2, name_str, theme.CLR_TITLE())
+
+    # Line 2: Age + Gen + Max trait
+    header_y += 1
+    meta_str = f"Age: {character.age} | Gen: {character.generation}th | Max: {character.max_trait_rating}"
+    stdscr.addstr(header_y, start_x + 2, meta_str, theme.CLR_ACCENT())
+
+    # Line 3: Freebie points (caller-formatted)
+    header_y += 1
+    stdscr.addstr(header_y, start_x + 2, freebie_str, freebie_color)
+
+    # Layout calculations for the sheet body
+    col_width = (container_width - 4) // 3
+    cx1 = start_x + 2
+    cx2 = cx1 + col_width + 1
+    cx3 = cx2 + col_width + 1
+    content_y = header_y + 2
+
+    return {
+        "start_x":           start_x,
+        "start_y":           start_y,
+        "start_y":           start_y,
+        "content_y":         content_y,
+        "cx1":               cx1,
+        "cx2":               cx2,
+        "cx3":               cx3,
+        "col_width":         col_width,
+        "container_height":  container_height,
+        "container_start_y": start_y,
+    }
+
 # --- [FULL 3-COLUMN SHEET] ---
 def draw_character_sheet_columns(stdscr, character, col1_items: list, col2_items: list, col3_items: list, layout: dict, active_col: int = 0, active_row: int = 0, is_interactive: bool = False):
     """
