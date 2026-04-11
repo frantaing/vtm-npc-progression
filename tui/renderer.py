@@ -8,6 +8,7 @@ Used by both MainView (interactive) and FinalView (static).
 # --- [IMPORTS] ---
 import curses
 from . import theme
+from . import utils
 
 # --- [SINGLE TRAIT ROW] ---
 def draw_trait_row(stdscr, y: int, x: int, name: str, data: dict, width: int, is_selected: bool = False, is_modified: bool = False, is_interactive: bool = False):
@@ -130,7 +131,6 @@ def draw_sheet_container(stdscr, character, title: str, freebie_str: str, freebi
 
     return {
         "start_x":           start_x,
-        "start_y":           start_y,
         "start_y":           start_y,
         "content_y":         content_y,
         "cx1":               cx1,
