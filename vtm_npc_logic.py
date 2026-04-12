@@ -223,3 +223,30 @@ class VtMCharacter:
             "humanity":      self.humanity,
             "willpower":     self.willpower,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "VtMCharacter":
+        """
+        Reconstructs a VtMCharacter from a dictionary (e.g. loaded from JSON).
+        Restores disciplines verbatim — does not re-run clan discipline defaults,
+        since the character may have out-of-clan disciplines added during progression.
+        """
+        character = cls(
+            name=data["name"],
+            clan=data["clan"],
+            age=data["age"],
+            generation=data["generation"],
+            is_free_mode=data.get("is_free_mode", False),
+            _skip_clan_init=True
+        )
+
+        character.attributes  = data.get("attributes",  {})
+        character.abilities   = data.get("abilities",   {})
+        character.disciplines = data.get("disciplines", {})
+        character.backgrounds = data.get("backgrounds", {})
+        character.virtues     = data.get("virtues",     {})
+        character.humanity    = data.get("humanity",    {"base": 0, "new": 0})
+        character.willpower   = data.get("willpower",   {"base": 0, "new": 0})
+        character.spent_freebies = data.get("spent_freebies", 0)
+
+        return character
