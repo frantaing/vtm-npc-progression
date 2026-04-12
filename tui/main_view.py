@@ -5,7 +5,7 @@ from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS, DISCIPLINES_LIST, BACKGROUNDS_LIST
 from .utils import QuitApplication
-from .renderer import draw_character_sheet_columns
+from .renderer import draw_character_sheet_columns, draw_sheet_container
 
 class MainView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -197,9 +197,9 @@ class MainView:
             self._add_new_trait(new_cat, c1, c2, c3)
 
     def _add_new_trait(self, category, c1, c2, c3):
+        self.is_inputting = True
         curses.curs_set(1)
-        
-        # Prepare the list (exclude existing traits)
+
         if category == "Discipline":
             options = sorted([d for d in DISCIPLINES_LIST if d not in self.character.disciplines])
         elif category == "Background":
@@ -207,38 +207,39 @@ class MainView:
         else:
             options = []
 
-        # 2. Calculate coordinates for in-line inputs
         h, w = self.stdscr.getmaxyx()
-        
-        # Re-calculate layout (must match _draw_screen logic!!)
         container_width = min(130, w - 2)
         container_height = min(50, h - 2)
-        start_x = (w - container_width) // 2
-        start_y = (h - container_height) // 2
-        
-        col_width = (container_width - 4) // 3
-        # Calculate X for col3
-        col3_x = start_x + 2 + (col_width + 1) * 2
-        
-        # Calculate Y for the Active Row
-        # Logic: Header (1) + Points (1) + Headers (2) + List Start (1) = +5 offset from start_y?
-        # Verify _draw_screen: 
-        # header_y = start_y + 1
-        # content_y = header_y + 2 (so start_y + 3)
-        # list_start_y = content_y + 1 (so start_y + 4)
-        list_start_y = start_y + 4
-        max_rows = container_height - 8
-        
-        # Calculate scroll offset for Col 3
+
+        # Build freebie string (needed to call draw_sheet_container to get accurate layout)
+        if self.character.is_free_mode:
+            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
+            freebie_color = theme.CLR_ACCENT()
+        else:
+            remaining = self.character.total_freebies - self.character.spent_freebies
+            freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
+            freebie_color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
+
+        # Get the same layout dict _draw_screen uses so coordinates match exactly
+        layout = draw_sheet_container(
+            self.stdscr, self.character,
+            "VTM NPC Progression Tool",
+            freebie_str, freebie_color,
+            container_width, container_height
+        )
+        layout["start_y"] = layout["content_y"]
+        layout["max_rows"] = container_height - 7
+
+        list_start_y = layout["content_y"]
+        col3_x = layout["cx3"]
+        max_rows = layout["max_rows"]
+
         scroll_offset = 0
-        if self.active_col == 2: # Column 3
+        if self.active_col == 2:
             if self.active_row >= max_rows:
                 scroll_offset = self.active_row - max_rows + 1
-        
-        # The visual row index (0 to max_rows)
+
         visual_row_index = self.active_row - scroll_offset
-        
-        # Final screen coordinates
         prompt_y = list_start_y + visual_row_index
         prompt_x = col3_x
 
@@ -246,18 +247,15 @@ class MainView:
             self._draw_screen(c1, c2, c3)
 
         try:
-            # Pass prompt="" so it looks like typing is *in* the cell
-            # The get_selection_input will handle the dropdown/typing logic
             name = utils.get_selection_input(self.stdscr, "", prompt_y, prompt_x, options, redraw_func)
-            
             if name:
                 self.character.set_initial_trait(category.lower() + 's', name, 0)
                 self.message = f"Added {name}"
                 self.message_color = theme.CLR_ACCENT()
-                
         except utils.InputCancelled:
             self.message = "Cancelled"
         finally:
+            self.is_inputting = False
             curses.curs_set(0)
 
     def _handle_deletion(self, c1, c2, c3):
@@ -300,43 +298,26 @@ class MainView:
 
         container_width = min(130, w - 2)
         container_height = min(50, h - 2)
-        start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
 
-        utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "VTM NPC Progression Tool")
-
-        # Header info
-        header_y = start_y + 1
-        info_str = f"{self.character.name} ({self.character.clan}) | Age: {self.character.age} | Gen: {self.character.generation}th"
-        self.stdscr.addstr(header_y, start_x + 2, info_str, theme.CLR_TITLE())
-
-        # Freebie points
-        header_y += 1
+        # Format freebie string
         if self.character.is_free_mode:
-            spent_str = f"Freebie Points Spent: {self.character.spent_freebies}"
-            color = theme.CLR_ACCENT()
+            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
+            freebie_color = theme.CLR_ACCENT()
         else:
             remaining = self.character.total_freebies - self.character.spent_freebies
-            spent_str = f"Freebie: {remaining}/{self.character.total_freebies}"
-            color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
-        self.stdscr.addstr(header_y, start_x + 2, spent_str, color)
+            freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
+            freebie_color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
 
-        # Layout calculations
-        col_width = (container_width - 4) // 3
-        cx1 = start_x + 2
-        cx2 = cx1 + col_width + 1
-        cx3 = cx2 + col_width + 1
-        content_y = header_y + 2
+        layout = draw_sheet_container(
+            self.stdscr, self.character,
+            "VTM NPC Progression Tool",
+            freebie_str, freebie_color,
+            container_width, container_height
+        )
 
-        layout = {
-            "start_y":           content_y,
-            "cx1":               cx1,
-            "cx2":               cx2,
-            "cx3":               cx3,
-            "col_width":         col_width,
-            "max_rows":          container_height - 7,
-            "container_height":  container_height,
-            "container_start_y": start_y,
-        }
+        # Remap content_y -> start_y for draw_character_sheet_columns
+        layout["start_y"] = layout["content_y"]
+        layout["max_rows"] = container_height - 7
 
         draw_character_sheet_columns(
             self.stdscr, self.character,
@@ -348,6 +329,8 @@ class MainView:
         )
 
         # Footer
+        start_y = layout["container_start_y"]
+        start_x = layout["start_x"]
         if self.message:
             utils.draw_wrapped_text(self.stdscr, start_y + container_height - 2, start_x + 2, self.message, container_width - 4, self.message_color)
         else:

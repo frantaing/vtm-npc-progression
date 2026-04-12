@@ -3,7 +3,7 @@ import curses
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter
-from .renderer import draw_character_sheet_columns
+from .renderer import draw_character_sheet_columns, draw_sheet_container
 
 class FinalView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -17,32 +17,29 @@ class FinalView:
             h, w = self.stdscr.getmaxyx()
             container_width = min(130, w - 2)
             container_height = min(55, h - 6)
-            start_x, start_y = (w - container_width) // 2, (h - container_height) // 2
-            
-            utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "FINAL CHARACTER SHEET")
-            
-            sheet_y, sheet_x = start_y + 2, start_x + 2
-            
-            self.stdscr.addstr(sheet_y, sheet_x, f"{self.character.name} ({self.character.clan})", theme.CLR_TITLE()); sheet_y += 1
-            self.stdscr.addstr(sheet_y, sheet_x, f"Age: {self.character.age} | Gen: {self.character.generation}th | Max: {self.character.max_trait_rating}", theme.CLR_ACCENT()); sheet_y += 1
-            
+
+            # Format freebie string
             if self.character.is_free_mode:
-                spent_str = f"Total Freebie Points Spent: {self.character.spent_freebies}"
-                color = theme.CLR_ACCENT()
+                freebie_str = f"Total Freebie Points Spent: {self.character.spent_freebies}"
+                freebie_color = theme.CLR_ACCENT()
             else:
                 remaining = self.character.total_freebies - self.character.spent_freebies
-                spent_str = f"Freebie Points: {self.character.spent_freebies}/{self.character.total_freebies} spent" + (f" ({remaining} remaining)" if remaining > 0 else "")
-                color = theme.CLR_ACCENT()
-            self.stdscr.addstr(sheet_y, sheet_x, spent_str, color); sheet_y += 2
-            
-            # --- [3-Column Layout] ---
-            col_width = (container_width - 6) // 3
-            cx1 = sheet_x
-            cx2 = sheet_x + col_width + 2
-            cx3 = sheet_x + (col_width * 2) + 4
-            content_y = sheet_y
+                freebie_str = f"Freebie Points: {self.character.spent_freebies}/{self.character.total_freebies} spent"
+                if remaining > 0:
+                    freebie_str += f" ({remaining} remaining)"
+                freebie_color = theme.CLR_ACCENT()
 
-            # Build item lists (same structure as MainView)
+            layout = draw_sheet_container(
+                self.stdscr, self.character,
+                "FINAL CHARACTER SHEET",
+                freebie_str, freebie_color,
+                container_width, container_height
+            )
+
+            layout["start_y"] = layout["content_y"]
+            layout["max_rows"] = container_height - 8
+
+            # Build item lists
             from vtm_npc_logic import ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST
 
             col1_items = [("Header", "ATTRIBUTES")] + [("Attribute", a) for a in ATTRIBUTES_LIST]
@@ -65,16 +62,8 @@ class FinalView:
             col3_items.append(("Humanity", "Humanity/Path"))
             col3_items.append(("Willpower", "Willpower"))
 
-            layout = {
-                "start_y":           content_y,
-                "cx1":               cx1,
-                "cx2":               cx2,
-                "cx3":               cx3,
-                "col_width":         col_width,
-                "max_rows":          container_height - 8,
-                "container_height":  container_height,
-                "container_start_y": start_y,
-            }
+            # Remap content_y -> start_y for draw_character_sheet_columns
+            layout["start_y"] = layout["content_y"]
 
             draw_character_sheet_columns(
                 self.stdscr, self.character,
@@ -82,14 +71,15 @@ class FinalView:
                 layout,
                 is_interactive=False
             )
-            
-            # --- [EXPORT PROMPT] ---
+
+            # Export prompt
+            start_y = layout["container_start_y"]
+            start_x = layout["start_x"]
             controls = "E: Export to Text | Any other key: Exit"
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls)) // 2, controls, theme.CLR_BORDER())
             self.stdscr.refresh()
-            
+
             key = self.stdscr.getch()
-            
             if key == ord('e') or key == ord('E'):
                 self._export_character(start_y + container_height - 2, start_x + 2)
             elif key != curses.KEY_RESIZE:
