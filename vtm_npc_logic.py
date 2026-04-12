@@ -205,3 +205,21 @@ class VtMCharacter:
         lines.append(f"{'Willpower':<20} [{self.willpower['new']}]")
         
         return "\n".join(lines)
+
+    def to_dict(self) -> dict:
+        """Exports the full character state to a serializable dictionary."""
+        return {
+            "name":          self.name,
+            "clan":          self.clan,
+            "age":           self.age,
+            "generation":    self.generation,
+            "is_free_mode":  self.is_free_mode,
+            "spent_freebies": self.spent_freebies,
+            "attributes":    self.attributes,
+            "abilities":     self.abilities,
+            "disciplines":   self.disciplines,
+            "backgrounds":   self.backgrounds,
+            "virtues":       self.virtues,
+            "humanity":      self.humanity,
+            "willpower":     self.willpower,
+        }
