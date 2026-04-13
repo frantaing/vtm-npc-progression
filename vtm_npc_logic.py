@@ -18,7 +18,7 @@ class VtMCharacter:
 
     """Stores and manages a VtM character's progression."""
 
-    def __init__(self, name: str, clan: str, age: int, generation: int, is_free_mode: bool = False):
+    def __init__(self, name: str, clan: str, age: int, generation: int, is_free_mode: bool = False, _skip_clan_init: bool = False):
         self.name = name
         self.clan = clan
         self.age = age
@@ -34,12 +34,11 @@ class VtMCharacter:
         self.willpower: Dict[str, int] = {"base": 0, "new": 0}
 
         self.max_trait_rating = GENERATION_DATA.get(generation, {}).get("max_trait", 5)
-        
         self.total_freebies = sys.maxsize if self.is_free_mode else self._calculate_total_freebies()
         self.spent_freebies = 0
 
-        # Automatically populate disciplines based on Clan (Case insensitive check)
-        self._apply_clan_disciplines()
+        if not _skip_clan_init: # Automatically populate disciplines based on Clan (Case insensitive check)
+            self._apply_clan_disciplines()
 
     def _apply_clan_disciplines(self):
 
@@ -206,3 +205,48 @@ class VtMCharacter:
         lines.append(f"{'Willpower':<20} [{self.willpower['new']}]")
         
         return "\n".join(lines)
+
+    def to_dict(self) -> dict:
+        """Exports the full character state to a serializable dictionary."""
+        return {
+            "name":          self.name,
+            "clan":          self.clan,
+            "age":           self.age,
+            "generation":    self.generation,
+            "is_free_mode":  self.is_free_mode,
+            "spent_freebies": self.spent_freebies,
+            "attributes":    self.attributes,
+            "abilities":     self.abilities,
+            "disciplines":   self.disciplines,
+            "backgrounds":   self.backgrounds,
+            "virtues":       self.virtues,
+            "humanity":      self.humanity,
+            "willpower":     self.willpower,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "VtMCharacter":
+        """
+        Reconstructs a VtMCharacter from a dictionary (e.g. loaded from JSON).
+        Restores disciplines verbatim — does not re-run clan discipline defaults,
+        since the character may have out-of-clan disciplines added during progression.
+        """
+        character = cls(
+            name=data["name"],
+            clan=data["clan"],
+            age=data["age"],
+            generation=data["generation"],
+            is_free_mode=data.get("is_free_mode", False),
+            _skip_clan_init=True
+        )
+
+        character.attributes  = data.get("attributes",  {})
+        character.abilities   = data.get("abilities",   {})
+        character.disciplines = data.get("disciplines", {})
+        character.backgrounds = data.get("backgrounds", {})
+        character.virtues     = data.get("virtues",     {})
+        character.humanity    = data.get("humanity",    {"base": 0, "new": 0})
+        character.willpower   = data.get("willpower",   {"base": 0, "new": 0})
+        character.spent_freebies = data.get("spent_freebies", 0)
+
+        return character
