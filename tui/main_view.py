@@ -146,24 +146,19 @@ class MainView:
 
     # --- [LOGIC HANDLERS] ---
     def _handle_modification(self, c1, c2, c3, delta):
-        """Handles Left/Right arrow keys to modify stats."""
         current_list = [c1, c2, c3][self.active_col]
         item = current_list[self.active_row]
-        
-        # Can't modify "Add New" buttons with arrows
-        if item.category in ["System", "Header", "Spacer"]: 
+
+        if item.category in ("System", "Header", "Spacer"):
             return
 
-        target_val = current_list + delta        
-        # Attempt improvement (logic handles bounds and cost)
+        target_val = item.data['new'] + delta
         success, msg = self.character.improve_trait(item.category, item.name, target_val)
-        
+
         if success:
             self.message = msg
             self.message_color = theme.CLR_ACCENT()
         else:
-            # Show errors (like "Not enough points" or "Min value reached")
-            # For silent bounds checking, check if msg contains "limit" logic
             if "Not enough points" in msg:
                 self.message = msg
                 self.message_color = theme.CLR_ERROR()
@@ -172,22 +167,18 @@ class MainView:
 
     # --- Helper for Number Keys ---
     def _handle_numeric_input(self, c1, c2, c3, value):
-        """Handles pressing keys 0-9 to jump directly to a value."""
         current_list = [c1, c2, c3][self.active_col]
         item = current_list[self.active_row]
-        
-        if category in ["System", "Header", "Spacer"]: 
+
+        if item.category in ("System", "Header", "Spacer"):
             return
 
-        # Attempt to set the trait directly to 'value'
         success, msg = self.character.improve_trait(item.category, item.name, value)
-        
+
         if success:
             self.message = msg
             self.message_color = theme.CLR_ACCENT()
         else:
-            # Sshow errors for bounds (e.g. trying to set 9 when max is 5)
-            # Or cost issues
             self.message = msg
             self.message_color = theme.CLR_ERROR()
 
@@ -265,10 +256,9 @@ class MainView:
         current_list = [c1, c2, c3][self.active_col]
         if not current_list:
             return
-        
+
         item = current_list[self.active_row]
-        
-        # Validation
+
         if item.category not in ("Discipline", "Background"):
             self.message = "Can only remove added Disciplines or Backgrounds."
             self.message_color = theme.CLR_ERROR()
@@ -276,17 +266,14 @@ class MainView:
 
         refund = (item.data['new'] - item.data['base']) * FREEBIE_COSTS.get(item.category, 0)
 
-        # Draw the screen first so the pop-up layers over it properly
         self._draw_screen(c1, c2, c3)
-        # Call the confirmation pop-up
         msg = f"Are you sure you want to completely remove {item.name}?\n\nThis will refund {refund} Freebie Points."
         confirm = utils.show_confirmation_popup(self.stdscr, "Confirm Deletion", msg, theme.CLR_ACCENT())
-        
+
         if confirm:
             success, msg = self.character.remove_trait(item.category, item.name)
             self.message = msg
             self.message_color = theme.CLR_ACCENT()
-            # Move cursor up one to avoid landing on a potentially shifted index or out of bounds
             if self.active_row > 0:
                 self.active_row -= 1
         else:
