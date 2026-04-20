@@ -147,25 +147,25 @@ def draw_character_sheet_columns(stdscr, character, col1_items: list, col2_items
 
     layout dict expects:
         {
-            "start_y":          int,  # top of content area
-            "cx1":              int,  # x start of col 1
-            "cx2":              int,  # x start of col 2
-            "cx3":              int,  # x start of col 3
-            "col_width":        int,  # width of each column
-            "max_rows":         int,  # max visible rows
-            "container_height": int,  # full container height
-            "container_start_y":int,  # top of container box
+            "start_y":           int,
+            "cx1":               int,
+            "cx2":               int,
+            "cx3":               int,
+            "col_width":         int,
+            "max_rows":          int,
+            "container_height":  int,
+            "container_start_y": int,
         }
 
-    Resolves trait data from character before passing to draw_column.
+    Items must be pre-resolved SheetItems (carrying their own data).
     """
-    start_y         = layout["start_y"]
-    cx1             = layout["cx1"]
-    cx2             = layout["cx2"]
-    cx3             = layout["cx3"]
-    col_width       = layout["col_width"]
-    max_rows        = layout["max_rows"]
-    container_height = layout["container_height"]
+    start_y          = layout["start_y"]
+    cx1              = layout["cx1"]
+    cx2              = layout["cx2"]
+    cx3              = layout["cx3"]
+    col_width        = layout["col_width"]
+    max_rows         = layout["max_rows"]
+    container_height  = layout["container_height"]
     container_start_y = layout["container_start_y"]
 
     # Draw vertical separators
@@ -175,24 +175,8 @@ def draw_character_sheet_columns(stdscr, character, col1_items: list, col2_items
         stdscr.addstr(i, cx2 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
         stdscr.addstr(i, cx3 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
 
-    # Resolve data into (cat, name, data) triples
-    def resolve(items):
-        resolved = []
-        for item in items:
-            cat, name = item
-            if cat in ("Header", "Spacer", "System"):
-                resolved.append((cat, name, {}))
-            else:
-                data = character.get_trait_data(cat, name)
-                resolved.append((cat, name, data))
-        return resolved
-
-    r1 = resolve(col1_items)
-    r2 = resolve(col2_items)
-    r3 = resolve(col3_items)
-
     dynamic = ("Discipline", "Background")
 
-    draw_column(stdscr, start_y, cx1, col_width, r1, 0, max_rows, active_col, active_row, is_interactive, dynamic)
-    draw_column(stdscr, start_y, cx2, col_width, r2, 1, max_rows, active_col, active_row, is_interactive, dynamic)
-    draw_column(stdscr, start_y, cx3, col_width, r3, 2, max_rows, active_col, active_row, is_interactive, dynamic)
+    draw_column(stdscr, start_y, cx1, col_width, col1_items, 0, max_rows, active_col, active_row, is_interactive, dynamic)
+    draw_column(stdscr, start_y, cx2, col_width, col2_items, 1, max_rows, active_col, active_row, is_interactive, dynamic)
+    draw_column(stdscr, start_y, cx3, col_width, col3_items, 2, max_rows, active_col, active_row, is_interactive, dynamic)
