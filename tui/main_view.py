@@ -151,10 +151,10 @@ class MainView:
         item = current_list[self.active_row]
         
         # Can't modify "Add New" buttons with arrows
-        if category in ["System", "Header", "Spacer"]: 
+        if item.category in ["System", "Header", "Spacer"]: 
             return
 
-        target_val = current_val + delta        
+        target_val = current_list + delta        
         # Attempt improvement (logic handles bounds and cost)
         success, msg = self.character.improve_trait(item.category, item.name, target_val)
         
