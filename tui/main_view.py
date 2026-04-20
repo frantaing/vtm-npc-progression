@@ -5,7 +5,7 @@ from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS, DISCIPLINES_LIST, BACKGROUNDS_LIST
 from .utils import QuitApplication
-from .renderer import draw_character_sheet_columns, draw_sheet_container
+from .renderer import draw_character_sheet_columns, draw_sheet_container, SheetItem
 
 class MainView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -21,6 +21,20 @@ class MainView:
         
         # To track list sizes for boundary checking
         self.col_counts = [0, 0, 0]
+
+    def move_selection(self, delta: int, items: list):
+        """Moves cursor by delta, skipping Header and Spacer items."""
+        new_row = self.active_row + delta
+        max_idx = len(items) - 1
+
+        if new_row < 0 or new_row > max_idx:
+            return
+
+        while 0 <= new_row <= max_idx and items[new_row].category in ("Header", "Spacer"):
+            new_row += delta
+
+        if 0 <= new_row <= max_idx:
+            self.active_row = new_row
 
     def run(self):
         """Main interaction loop using direct navigation."""
