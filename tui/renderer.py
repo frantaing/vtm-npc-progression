@@ -58,10 +58,7 @@ def draw_system_row(stdscr, y: int, x: int, name: str, width: int, is_selected: 
 
 # --- [SINGLE COLUMN] ---
 def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col_idx: int, max_rows: int, active_col: int, active_row: int, is_interactive: bool = False, dynamic_categories: tuple = ()):
-    """
-    Renders one column of the character sheet.
-    ... [Original docstring remains same] ...
-    """
+    """Renders one column of the character sheet."""
     scroll_offset = 0
     if is_interactive and active_col == col_idx:
         if active_row >= max_rows:
@@ -72,33 +69,29 @@ def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col
         if idx >= len(items):
             break
 
-        cat, name = items[idx][0], items[idx][1]
+        item = items[idx]
         row_y = start_y + i
 
-        if cat == "Spacer":
+        if item.category == "Spacer":
             continue
 
-        if cat == "Header":
-            header_text = f"{theme.SYM_HEADER_L}{name}{theme.SYM_HEADER_R}"
+        if item.category == "Header":
+            header_text = f"{theme.SYM_HEADER_L}{item.name}{theme.SYM_HEADER_R}"
             pad = (width - len(header_text)) // 2
             stdscr.addstr(row_y, start_x + max(0, pad), header_text[:width], theme.CLR_BORDER())
             continue
 
         is_selected = is_interactive and (active_col == col_idx) and (active_row == idx)
 
-        if cat == "System":
-            draw_system_row(stdscr, row_y, start_x + 2, name, width, is_selected=is_selected)
+        if item.category == "System":
+            draw_system_row(stdscr, row_y, start_x + 2, item.name, width, is_selected=is_selected)
             continue
 
-        # Data resolution
-        data = items[idx][2] if len(items[idx]) == 3 else {"base": 0, "new": 0}
+        is_modified = item.data['base'] != item.data['new']
+        if is_interactive and item.category in dynamic_categories:
+            is_modified = True
 
-        # Calculate if row should be Red (modified)
-        is_modified = data['base'] != data['new']
-        if is_interactive and cat in dynamic_categories:
-            is_modified = True  # Added categories are always red in interactive mode
-
-        draw_trait_row(stdscr, row_y, start_x + 2, name, data, width, is_selected, is_modified, is_interactive)
+        draw_trait_row(stdscr, row_y, start_x + 2, item.name, item.data, width, is_selected, is_modified, is_interactive)
 
 # --- [CONTAINER + HEADER] ---
 def draw_sheet_container(stdscr, character, title: str, freebie_str: str, freebie_color, container_width: int, container_height: int) -> dict:
