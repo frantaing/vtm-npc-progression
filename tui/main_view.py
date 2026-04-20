@@ -122,35 +122,47 @@ class MainView:
         if 0 <= new_row <= max_idx:
             self.active_row = new_row
 
-    def _get_col1_items(self) -> List[Tuple[str, str]]:
-        return [("Header", "ATTRIBUTES")] + [("Attribute", attr) for attr in ATTRIBUTES_LIST]
+    def _get_col1_items(self) -> list:
+        items = [SheetItem("Header", "ATTRIBUTES")]
+        for attr in ATTRIBUTES_LIST:
+            data = self.character.get_trait_data("Attribute", attr)
+            items.append(SheetItem("Attribute", attr, data))
+        return items
 
-    def _get_col2_items(self) -> List[Tuple[str, str]]:
-        # List ALL abilities so user can buy them from 0
-        return [("Header", "ABILITIES")] + [("Ability", abil) for abil in ABILITIES_LIST]
+    def _get_col2_items(self) -> list:
+        items = [SheetItem("Header", "ABILITIES")]
+        for abil in ABILITIES_LIST:
+            data = self.character.get_trait_data("Ability", abil)
+            items.append(SheetItem("Ability", abil, data))
+        return items
 
-    def _get_col3_items(self) -> List[Tuple[str, str]]:
+    def _get_col3_items(self) -> list:
         items = []
-        
-        # Disciplines
-        items.append(("Header", "DISCIPLINES"))
-        for disc in self.character.disciplines: items.append(("Discipline", disc))
-        items.append(("System", "Add Discipline"))
-        # Backgrounds
-        items.append(("Spacer", ""))
-        items.append(("Header", "BACKGROUNDS"))
-        for bg in self.character.backgrounds: items.append(("Background", bg))
-        items.append(("System", "Add Background"))
-        # Virtues
-        items.append(("Spacer", ""))
-        items.append(("Header", "VIRTUES"))
-        for virt in VIRTUES_LIST: items.append(("Virtue", virt))
-        # Path/Willpower
-        items.append(("Spacer", ""))
-        items.append(("Header", "PATH/WILLPOWER"))
-        items.append(("Humanity", "Humanity/Path"))
-        items.append(("Willpower", "Willpower"))
-        
+
+        items.append(SheetItem("Header", "DISCIPLINES"))
+        for disc in self.character.disciplines:
+            data = self.character.get_trait_data("Discipline", disc)
+            items.append(SheetItem("Discipline", disc, data))
+        items.append(SheetItem("System", "Add Discipline"))
+
+        items.append(SheetItem("Spacer", ""))
+        items.append(SheetItem("Header", "BACKGROUNDS"))
+        for bg in self.character.backgrounds:
+            data = self.character.get_trait_data("Background", bg)
+            items.append(SheetItem("Background", bg, data))
+        items.append(SheetItem("System", "Add Background"))
+
+        items.append(SheetItem("Spacer", ""))
+        items.append(SheetItem("Header", "VIRTUES"))
+        for virt in VIRTUES_LIST:
+            data = self.character.get_trait_data("Virtue", virt)
+            items.append(SheetItem("Virtue", virt, data))
+
+        items.append(SheetItem("Spacer", ""))
+        items.append(SheetItem("Header", "PATH/WILLPOWER"))
+        items.append(SheetItem("Humanity", "Humanity/Path", self.character.get_trait_data("Humanity", "Humanity/Path")))
+        items.append(SheetItem("Willpower", "Willpower", self.character.get_trait_data("Willpower", "Willpower")))
+
         return items
 
     # --- [LOGIC HANDLERS] ---
