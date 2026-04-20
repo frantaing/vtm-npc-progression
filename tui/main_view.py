@@ -37,7 +37,7 @@ class MainView:
             self.active_row = new_row
 
     def run(self):
-        """Main interaction loop using direct navigation."""
+        """Main interaction loop."""
         while True:
             # Build data lists
             col1_items = self._get_col1_items()
@@ -47,40 +47,37 @@ class MainView:
             self.col_counts = [len(col1_items), len(col2_items), len(col3_items)]
             if self.active_row >= self.col_counts[self.active_col]:
                 self.active_row = max(0, self.col_counts[self.active_col] - 1)
-            
-            # INITIAL CHECK: If user somehow landed on a header/spacer, move down
+
+            # Ensure cursor never lands on a Header/Spacer on initial load
             current_list = [col1_items, col2_items, col3_items][self.active_col]
-            if current_list:
-                item_type = current_list[self.active_row][0]
-                if item_type in ["Header", "Spacer"]:
-                    self._move_cursor(1, current_list)
+            if current_list and current_list[self.active_row].category in ("Header", "Spacer"):
+                self.move_selection(1, current_list)
 
             self._draw_screen(col1_items, col2_items, col3_items)
             self.stdscr.refresh()
             key = self.stdscr.getch()
-            
-            if key == 24: return # Ctrl+X
-            elif key == curses.KEY_RESIZE: 
+
+            if key == 24: # Ctrl+X
+                return 
+            elif key == curses.KEY_RESIZE:
                 self.stdscr.erase()
             
             # --- Navigation ---
             elif key == curses.KEY_UP:
                 current_list = [col1_items, col2_items, col3_items][self.active_col]
-                self._move_cursor(-1, current_list)
+                self.move_selection(-1, current_list)
                 self.message = ""
             elif key == curses.KEY_DOWN:
                 current_list = [col1_items, col2_items, col3_items][self.active_col]
-                self._move_cursor(1, current_list)
+                self.move_selection(1, current_list)
                 self.message = ""
-            elif key == ord(' ') or key == 9: # Space or Tab switches columns
+
+            elif key == ord(' ') or key == 9:
                 self.active_col = (self.active_col + 1) % 3
-                self.active_row = 0 # Reset to top of new column
-                # Ensure the user doesn't land on a header after switching
+                self.active_row = 0
                 new_list = [col1_items, col2_items, col3_items][self.active_col]
-                if new_list:
-                    item_type = new_list[0][0]
-                    if item_type in ["Header", "Spacer"]:
-                        self._move_cursor(1, new_list)
+                if new_list and new_list[0].category in ("Header", "Spacer"):
+                    self.move_selection(1, new_list)
                 self.message = ""
             
             # --- Modification ---
@@ -99,29 +96,11 @@ class MainView:
             elif key == curses.KEY_DC or key == ord('x'):
                 self._handle_deletion(col1_items, col2_items, col3_items)
 
-            # --- Special Actions ---
             elif key == ord('\n'):
                 self._handle_enter(col1_items, col2_items, col3_items)
 
     # --- [DATA HELPERS] ---
-    # These generate the lists of (Category, Name) tuples for each column.
-    def _move_cursor(self, delta, items):
-        """Moves cursor, skipping over 'Header' and 'Spacer' items."""
-        new_row = self.active_row + delta
-        max_idx = len(items) - 1
-        
-        # Simple bounds check first
-        if new_row < 0: return
-        if new_row > max_idx: return
-        
-        # Check if target is a Header/Spacer. 
-        while 0 <= new_row <= max_idx and items[new_row][0] in ["Header", "Spacer"]:
-            new_row += delta
-        
-        # Re-check bounds after skipping
-        if 0 <= new_row <= max_idx:
-            self.active_row = new_row
-
+    # These generate the lists of (Category, Name) tuples for each column
     def _get_col1_items(self) -> list:
         items = [SheetItem("Header", "ATTRIBUTES")]
         for attr in ATTRIBUTES_LIST:
@@ -169,18 +148,15 @@ class MainView:
     def _handle_modification(self, c1, c2, c3, delta):
         """Handles Left/Right arrow keys to modify stats."""
         current_list = [c1, c2, c3][self.active_col]
-        category, name = current_list[self.active_row]
+        item = current_list[self.active_row]
         
-         # Can't modify "Add New" buttons with arrows
-        if category in ["System", "Header", "Spacer"]: return
+        # Can't modify "Add New" buttons with arrows
+        if category in ["System", "Header", "Spacer"]: 
+            return
 
-        # Get current data
-        trait_data = self.character.get_trait_data(category, name)
-        current_val = trait_data['new']
-        target_val = current_val + delta
-        
+        target_val = current_val + delta        
         # Attempt improvement (logic handles bounds and cost)
-        success, msg = self.character.improve_trait(category, name, target_val)
+        success, msg = self.character.improve_trait(item.category, item.name, target_val)
         
         if success:
             self.message = msg
@@ -198,12 +174,13 @@ class MainView:
     def _handle_numeric_input(self, c1, c2, c3, value):
         """Handles pressing keys 0-9 to jump directly to a value."""
         current_list = [c1, c2, c3][self.active_col]
-        category, name = current_list[self.active_row]
+        item = current_list[self.active_row]
         
-        if category in ["System", "Header", "Spacer"]: return
+        if category in ["System", "Header", "Spacer"]: 
+            return
 
         # Attempt to set the trait directly to 'value'
-        success, msg = self.character.improve_trait(category, name, value)
+        success, msg = self.character.improve_trait(item.category, item.name, value)
         
         if success:
             self.message = msg
@@ -216,10 +193,10 @@ class MainView:
 
     def _handle_enter(self, c1, c2, c3):
         current_list = [c1, c2, c3][self.active_col]
-        category, name = current_list[self.active_row]
-        
-        if category == "System":
-            new_cat = "Discipline" if "Discipline" in name else "Background"
+        item = current_list[self.active_row]
+
+        if item.category == "System":
+            new_cat = "Discipline" if "Discipline" in item.name else "Background"
             self._add_new_trait(new_cat, c1, c2, c3)
 
     def _add_new_trait(self, category, c1, c2, c3):
@@ -286,33 +263,32 @@ class MainView:
 
     def _handle_deletion(self, c1, c2, c3):
         current_list = [c1, c2, c3][self.active_col]
-        if not current_list: return
+        if not current_list:
+            return
         
-        category, name = current_list[self.active_row]
+        item = current_list[self.active_row]
         
         # Validation
-        if category not in ["Discipline", "Background"] or name == "System" or category in ["Header", "Spacer"]:
+        if item.category not in ("Discipline", "Background"):
             self.message = "Can only remove added Disciplines or Backgrounds."
             self.message_color = theme.CLR_ERROR()
             return
 
-        # Prepare Data
-        trait_data = self.character.get_trait_data(category, name)
-        refund = (trait_data['new'] - trait_data['base']) * FREEBIE_COSTS.get(category, 0)
-        
+        refund = (item.data['new'] - item.data['base']) * FREEBIE_COSTS.get(item.category, 0)
+
         # Draw the screen first so the pop-up layers over it properly
         self._draw_screen(c1, c2, c3)
-        
         # Call the confirmation pop-up
-        msg = f"Are you sure you want to completely remove {name}?\n\nThis will refund {refund} Freebie Points."
+        msg = f"Are you sure you want to completely remove {item.name}?\n\nThis will refund {refund} Freebie Points."
         confirm = utils.show_confirmation_popup(self.stdscr, "Confirm Deletion", msg, theme.CLR_ACCENT())
         
         if confirm:
-            success, msg = self.character.remove_trait(category, name)
+            success, msg = self.character.remove_trait(item.category, item.name)
             self.message = msg
             self.message_color = theme.CLR_ACCENT()
             # Move cursor up one to avoid landing on a potentially shifted index or out of bounds
-            if self.active_row > 0: self.active_row -= 1
+            if self.active_row > 0:
+                self.active_row -= 1
         else:
             self.message = "Deletion cancelled."
             self.message_color = theme.CLR_TEXT()
