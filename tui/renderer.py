@@ -5,10 +5,16 @@ Shared rendering logic for the 3-column character sheet body.
 Used by both MainView (interactive) and FinalView (static).
 """
 
-# --- [IMPORTS] ---
 import curses
 from . import theme
 from . import utils
+from typing import NamedTuple
+
+# --- [SHEET ITEM] ---
+class SheetItem(NamedTuple):
+    category: str
+    name: str
+    data: dict = {}
 
 # --- [SINGLE TRAIT ROW] ---
 def draw_trait_row(stdscr, y: int, x: int, name: str, data: dict, width: int, is_selected: bool = False, is_modified: bool = False, is_interactive: bool = False):
