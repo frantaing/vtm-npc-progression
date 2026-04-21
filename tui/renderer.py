@@ -5,10 +5,16 @@ Shared rendering logic for the 3-column character sheet body.
 Used by both MainView (interactive) and FinalView (static).
 """
 
-# --- [IMPORTS] ---
 import curses
 from . import theme
 from . import utils
+from typing import NamedTuple
+
+# --- [SHEET ITEM] ---
+class SheetItem(NamedTuple):
+    category: str
+    name: str
+    data: dict = {}
 
 # --- [SINGLE TRAIT ROW] ---
 def draw_trait_row(stdscr, y: int, x: int, name: str, data: dict, width: int, is_selected: bool = False, is_modified: bool = False, is_interactive: bool = False):
@@ -52,10 +58,7 @@ def draw_system_row(stdscr, y: int, x: int, name: str, width: int, is_selected: 
 
 # --- [SINGLE COLUMN] ---
 def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col_idx: int, max_rows: int, active_col: int, active_row: int, is_interactive: bool = False, dynamic_categories: tuple = ()):
-    """
-    Renders one column of the character sheet.
-    ... [Original docstring remains same] ...
-    """
+    """Renders one column of the character sheet."""
     scroll_offset = 0
     if is_interactive and active_col == col_idx:
         if active_row >= max_rows:
@@ -66,33 +69,29 @@ def draw_column(stdscr, start_y: int, start_x: int, width: int, items: list, col
         if idx >= len(items):
             break
 
-        cat, name = items[idx][0], items[idx][1]
+        item = items[idx]
         row_y = start_y + i
 
-        if cat == "Spacer":
+        if item.category == "Spacer":
             continue
 
-        if cat == "Header":
-            header_text = f"{theme.SYM_HEADER_L}{name}{theme.SYM_HEADER_R}"
+        if item.category == "Header":
+            header_text = f"{theme.SYM_HEADER_L}{item.name}{theme.SYM_HEADER_R}"
             pad = (width - len(header_text)) // 2
             stdscr.addstr(row_y, start_x + max(0, pad), header_text[:width], theme.CLR_BORDER())
             continue
 
         is_selected = is_interactive and (active_col == col_idx) and (active_row == idx)
 
-        if cat == "System":
-            draw_system_row(stdscr, row_y, start_x + 2, name, width, is_selected=is_selected)
+        if item.category == "System":
+            draw_system_row(stdscr, row_y, start_x + 2, item.name, width, is_selected=is_selected)
             continue
 
-        # Data resolution
-        data = items[idx][2] if len(items[idx]) == 3 else {"base": 0, "new": 0}
+        is_modified = item.data['base'] != item.data['new']
+        if is_interactive and item.category in dynamic_categories:
+            is_modified = True
 
-        # Calculate if row should be Red (modified)
-        is_modified = data['base'] != data['new']
-        if is_interactive and cat in dynamic_categories:
-            is_modified = True  # Added categories are always red in interactive mode
-
-        draw_trait_row(stdscr, row_y, start_x + 2, name, data, width, is_selected, is_modified, is_interactive)
+        draw_trait_row(stdscr, row_y, start_x + 2, item.name, item.data, width, is_selected, is_modified, is_interactive)
 
 # --- [CONTAINER + HEADER] ---
 def draw_sheet_container(stdscr, character, title: str, freebie_str: str, freebie_color, container_width: int, container_height: int) -> dict:
@@ -148,25 +147,25 @@ def draw_character_sheet_columns(stdscr, character, col1_items: list, col2_items
 
     layout dict expects:
         {
-            "start_y":          int,  # top of content area
-            "cx1":              int,  # x start of col 1
-            "cx2":              int,  # x start of col 2
-            "cx3":              int,  # x start of col 3
-            "col_width":        int,  # width of each column
-            "max_rows":         int,  # max visible rows
-            "container_height": int,  # full container height
-            "container_start_y":int,  # top of container box
+            "start_y":           int,
+            "cx1":               int,
+            "cx2":               int,
+            "cx3":               int,
+            "col_width":         int,
+            "max_rows":          int,
+            "container_height":  int,
+            "container_start_y": int,
         }
 
-    Resolves trait data from character before passing to draw_column.
+    Items must be pre-resolved SheetItems (carrying their own data).
     """
-    start_y         = layout["start_y"]
-    cx1             = layout["cx1"]
-    cx2             = layout["cx2"]
-    cx3             = layout["cx3"]
-    col_width       = layout["col_width"]
-    max_rows        = layout["max_rows"]
-    container_height = layout["container_height"]
+    start_y          = layout["start_y"]
+    cx1              = layout["cx1"]
+    cx2              = layout["cx2"]
+    cx3              = layout["cx3"]
+    col_width        = layout["col_width"]
+    max_rows         = layout["max_rows"]
+    container_height  = layout["container_height"]
     container_start_y = layout["container_start_y"]
 
     # Draw vertical separators
@@ -176,24 +175,8 @@ def draw_character_sheet_columns(stdscr, character, col1_items: list, col2_items
         stdscr.addstr(i, cx2 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
         stdscr.addstr(i, cx3 - 1, theme.SYM_BORDER_V, theme.CLR_BORDER())
 
-    # Resolve data into (cat, name, data) triples
-    def resolve(items):
-        resolved = []
-        for item in items:
-            cat, name = item
-            if cat in ("Header", "Spacer", "System"):
-                resolved.append((cat, name, {}))
-            else:
-                data = character.get_trait_data(cat, name)
-                resolved.append((cat, name, data))
-        return resolved
-
-    r1 = resolve(col1_items)
-    r2 = resolve(col2_items)
-    r3 = resolve(col3_items)
-
     dynamic = ("Discipline", "Background")
 
-    draw_column(stdscr, start_y, cx1, col_width, r1, 0, max_rows, active_col, active_row, is_interactive, dynamic)
-    draw_column(stdscr, start_y, cx2, col_width, r2, 1, max_rows, active_col, active_row, is_interactive, dynamic)
-    draw_column(stdscr, start_y, cx3, col_width, r3, 2, max_rows, active_col, active_row, is_interactive, dynamic)
+    draw_column(stdscr, start_y, cx1, col_width, col1_items, 0, max_rows, active_col, active_row, is_interactive, dynamic)
+    draw_column(stdscr, start_y, cx2, col_width, col2_items, 1, max_rows, active_col, active_row, is_interactive, dynamic)
+    draw_column(stdscr, start_y, cx3, col_width, col3_items, 2, max_rows, active_col, active_row, is_interactive, dynamic)
