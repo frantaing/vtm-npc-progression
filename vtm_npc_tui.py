@@ -7,7 +7,6 @@ This module contains the UI for the tool. It handles all rendering and
 user input, and uses on vtm_npc_logic.py for character management.
 """
 
-# --- [IMPORTS] ---
 import curses
 import sys
 import traceback
@@ -36,17 +35,21 @@ class TUIApp:
 
     def run(self):
         """Main application orchestrator."""
-        is_free_mode = False
         try:
             # 0. Greeting
             greeting_view = GreetingView(self.stdscr)
-            is_free_mode = greeting_view.run()
+            result = greeting_view.run()
 
-            # 1. Setup
-            setup_view = SetupView(self.stdscr)
-            self.character = setup_view.run(is_free_mode=is_free_mode)
-            if not self.character:
-                return 
+            if result.mode == "load":
+                # Skip SetupView entirely — character is already built
+                self.character = result.character
+            else:
+                # 1. Setup
+                is_free_mode = result.mode == "free"
+                setup_view = SetupView(self.stdscr)
+                self.character = setup_view.run(is_free_mode=is_free_mode)
+                if not self.character:
+                    return
 
             # 2. Main Interaction
             main_view = MainView(self.stdscr, self.character)
@@ -54,7 +57,7 @@ class TUIApp:
 
         except QuitApplication:
             pass
-        
+
         # 3. Final Display
         if self.character:
             final_view = FinalView(self.stdscr, self.character)
