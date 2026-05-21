@@ -223,3 +223,13 @@ def safe_input(prompt_fn, *args, **kwargs):
                 return result
         except InputCancelled:
             continue
+
+def get_file_selection_input(stdscr, prompt: str, y: int, x: int, options: list, current_screen_func, *args, **kwargs) -> str:
+    """
+    Wraps get_selection_input with a fallback when no save files exist.
+    If options is empty, falls back to plain get_string_input.
+    """
+    if options:
+        return get_selection_input(stdscr, prompt, y, x, options, current_screen_func, *args, **kwargs)
+    else:
+        return get_string_input(stdscr, prompt, y, x, current_screen_func, *args, **kwargs)
