@@ -61,8 +61,6 @@ class MainView:
                 return 
             elif key == curses.KEY_RESIZE:
                 self.stdscr.erase()
-            elif key == 19:  # Ctrl+S
-                self._save_character()
             
             # --- Navigation ---
             elif key == curses.KEY_UP:
@@ -282,41 +280,6 @@ class MainView:
             self.message = "Deletion cancelled."
             self.message_color = theme.CLR_TEXT()
 
-    def _save_character(self):
-        """Handles Ctrl+S quicksave."""
-        from .save_manager import save_character, default_save_name
-
-        h, w = self.stdscr.getmaxyx()
-        container_width = min(130, w - 2)
-        container_height = min(50, h - 2)
-        start_x = (w - container_width) // 2
-        start_y = (h - container_height) // 2
-
-        default_name = default_save_name(self.character)
-
-        try:
-            filename = utils.get_string_input(
-                self.stdscr,
-                f"Save as (default: {default_name}): ",
-                start_y + container_height - 2,
-                start_x + 2,
-                lambda: None
-            )
-        except utils.InputCancelled:
-            return
-
-        if not filename:
-            filename = default_name
-
-        success, msg = save_character(self.character, filename)
-
-        if success:
-            self.message = msg
-            self.message_color = theme.CLR_ACCENT()
-        else:
-            self.message = msg
-            self.message_color = theme.CLR_ERROR()
-
     # --- [DRAWING] ---
     def _draw_screen(self, col1, col2, col3):
         h, w = self.stdscr.getmaxyx()
@@ -360,5 +323,5 @@ class MainView:
         if self.message:
             utils.draw_wrapped_text(self.stdscr, start_y + container_height - 2, start_x + 2, self.message, container_width - 4, self.message_color)
         else:
-            controls = "Arrows/0-9: Modify | Space: Next Col | Enter: Add | Ctrl+S: Save | Ctrl+X: Done"
+            controls = "Arrows/0-9: Modify | Space: Next Col | Enter: Add | Ctrl+X: Done"
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls)) // 2, controls, theme.CLR_ACCENT())
