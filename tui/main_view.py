@@ -323,5 +323,5 @@ class MainView:
         if self.message:
             utils.draw_wrapped_text(self.stdscr, start_y + container_height - 2, start_x + 2, self.message, container_width - 4, self.message_color)
         else:
-            controls = "Arrows/0-9: Modify | Space: Next Col | Enter: Add/Select | Ctrl+X: Done"
+            controls = "Arrows/0-9: Modify | Space: Next Col | Enter: Add | Ctrl+X: Done"
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls)) // 2, controls, theme.CLR_ACCENT())

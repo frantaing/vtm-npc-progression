@@ -81,13 +81,15 @@ class FinalView:
             # Export prompt
             start_y = layout["container_start_y"]
             start_x = layout["start_x"]
-            controls = "E: Export to Text | Any other key: Exit"
+            controls = "E: Export to Text | S: Save | Any other key: Exit"
             self.stdscr.addstr(start_y + container_height - 2, start_x + (container_width - len(controls)) // 2, controls, theme.CLR_BORDER())
             self.stdscr.refresh()
 
             key = self.stdscr.getch()
             if key == ord('e') or key == ord('E'):
                 self._export_character(start_y + container_height - 2, start_x + 2)
+            elif key == ord('s') or key == ord('S'):
+                self._save_character(start_y + container_height - 2, start_x + 2)
             elif key != curses.KEY_RESIZE:
                 return
 
@@ -119,3 +121,35 @@ class FinalView:
             utils.show_popup(self.stdscr, "Success", f"Character saved to {filename}", theme.CLR_ACCENT())
         except Exception as e:
             utils.show_popup(self.stdscr, "Error", f"Failed to save: {str(e)}", theme.CLR_ERROR())
+
+    def _save_character(self, prompt_y, prompt_x):
+        """Handles the logic for saving character to a JSON file."""
+        from .save_manager import save_character, default_save_name
+
+        def dummy_redraw():
+            pass
+
+        default_name = default_save_name(self.character)
+
+        self.stdscr.move(prompt_y, 0)
+        self.stdscr.clrtoeol()
+
+        try:
+            filename = utils.get_string_input(
+                self.stdscr,
+                f"Save as (default: {default_name}): ",
+                prompt_y, prompt_x,
+                dummy_redraw
+            )
+        except utils.InputCancelled:
+            return
+
+        if not filename:
+            filename = default_name
+
+        success, msg = save_character(self.character, filename)
+
+        if success:
+            utils.show_popup(self.stdscr, "Saved", msg, theme.CLR_ACCENT())
+        else:
+            utils.show_popup(self.stdscr, "Error", msg, theme.CLR_ERROR())
