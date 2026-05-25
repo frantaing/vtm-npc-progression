@@ -18,6 +18,7 @@ So this tool solves my problem by using age-based progression systems to generat
 - **Generation Limits:** Enforces max trait ratings (e.g., Gen 8 can have traits up to 5, Gen 7 up to 6, and so on).
 - **Interactive TUI:** A fully interactive terminal interface using `curses`.
 - **Free Mode:** An optional mode for unlimited building without point restrictions.
+- **Save & Load:** Save characters to JSON files and reload them later, skipping the setup wizard entirely. Supports a library of NPC sheets stored in the `saves/` directory.
 
 ## Getting Started
 
