@@ -15,7 +15,7 @@ from tui.greeting_view import GreetingView
 from tui.setup_view import SetupView
 from tui.main_view import MainView
 from tui.final_view import FinalView
-from tui import theme # Theme import here!
+from tui import theme
 
 # --- [TUI ORCHESTRATOR] ---
 class TUIApp:
