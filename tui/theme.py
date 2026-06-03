@@ -72,7 +72,7 @@ def CLR_BORDER():
 
 def CLR_TITLE():
     """Headings/Titles (Bold Red)"""
-    return curses.color_pair(_ID_ACCENT) | curses.A_BOLD | curses.A_UNDERLINE
+    return curses.color_pair(_ID_ACCENT) | curses.A_BOLD
 
 def CLR_SELECTED():
     """Selected Menu Items (Inverse Red)"""

@@ -5,6 +5,9 @@ from . import theme
 from .save_manager import list_saves, load_character, default_save_name
 from vtm_npc_logic import VtMCharacter
 
+# --- [VERSION] ---
+VERSION = "v2.4.2"
+
 # --- [RESULT TYPE] ---
 class GreetingResult(NamedTuple):
     mode: str  # "default", "free", "load"
@@ -45,7 +48,7 @@ class GreetingView:
 
             utils.draw_box(self.stdscr, start_y, start_x, container_height, container_width, "Welcome")
 
-            title = "VTM NPC Progression Tool"
+            title = f"VTM NPC Progression Tool {VERSION}"
             self.stdscr.addstr(start_y + 2, start_x + (container_width - len(title)) // 2, title, theme.CLR_TITLE())
             self.stdscr.addstr(start_y + 4, start_x + 2, "Please select a mode:", theme.CLR_TEXT())
 
