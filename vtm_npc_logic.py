@@ -130,17 +130,10 @@ class VtMCharacter:
 
         # Apply changes
         trait_data["new"] = target_value
-        
-        # Update spent pool (refunds automatically subtract because total_cost is negative)
-        if not self.is_free_mode:
-            self.spent_freebies += total_cost
-        elif total_cost > 0: 
-            # In free mode, spent freebie points, but refunds just lower the counter
-            self.spent_freebies += total_cost
-        else:
-            # Free mode refund logic
-            # Also keeps coutner accurate
-            self.spent_freebies += total_cost
+
+        # Always track spent freebies unconditionally.
+        # Works for both normal and free mode; negative total_cost handles refunds automatically
+        self.spent_freebies += total_cost
 
         action = "raised" if dots_diff > 0 else "lowered"
         points_label = "Cost" if dots_diff > 0 else "Refund"
