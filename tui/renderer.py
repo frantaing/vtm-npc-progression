@@ -130,8 +130,7 @@ def draw_sheet_container(stdscr, character, title: str, freebie_str: str, freebi
 
     return {
         "start_x":           start_x,
-        "start_y":           start_y,
-        "content_y":         content_y,
+        "start_y":           content_y,
         "cx1":               cx1,
         "cx2":               cx2,
         "cx3":               cx3,
