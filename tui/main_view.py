@@ -206,13 +206,8 @@ class MainView:
         container_height = min(50, h - 2)
 
         # Build freebie string (needed to call draw_sheet_container to get accurate layout)
-        if self.character.is_free_mode:
-            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
-            freebie_color = theme.CLR_ACCENT()
-        else:
-            remaining = self.character.total_freebies - self.character.spent_freebies
-            freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
-            freebie_color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
+        freebie_str, freebie_state = self.character.get_freebie_display()
+        freebie_color = theme.CLR_ERROR() if freebie_state == "empty" else theme.CLR_ACCENT()
 
         # Get the same layout dict _draw_screen uses so coordinates match exactly
         layout = draw_sheet_container(
@@ -288,13 +283,8 @@ class MainView:
         container_height = min(50, h - 2)
 
         # Format freebie string
-        if self.character.is_free_mode:
-            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
-            freebie_color = theme.CLR_ACCENT()
-        else:
-            remaining = self.character.total_freebies - self.character.spent_freebies
-            freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
-            freebie_color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
+        freebie_str, freebie_state = self.character.get_freebie_display()
+        freebie_color = theme.CLR_ERROR() if freebie_state == "empty" else theme.CLR_ACCENT()
 
         layout = draw_sheet_container(
             self.stdscr, self.character,

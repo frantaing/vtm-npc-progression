@@ -61,6 +61,22 @@ class VtMCharacter:
                 return points
         return AGE_FREEBIE_BRACKETS[-1][1]
 
+    def get_freebie_display(self) -> tuple[str, str]:
+        
+        """
+        Returns a (display_string, state) tuple for the freebie points block.
+        State is one of: "normal", "empty", "free".
+        Callers resolve state to a color attribute.
+        """
+        
+        if self.is_free_mode:
+            return f"Freebie Points Spent: {self.spent_freebies}", "free"
+        
+        remaining = self.total_freebies - self.spent_freebies
+        display = f"Freebie: {remaining}/{self.total_freebies}"
+        state = "empty" if remaining <= 0 else "normal"
+        return display, state
+
     def set_initial_trait(self, category: str, trait_name: str, value: int):
 
         """Sets the initial base and new value for a named trait."""
@@ -90,7 +106,7 @@ class VtMCharacter:
     # Trait modification
     def improve_trait(self, category_name: str, trait_name: str, target_value: int) -> Tuple[bool, str]:
 
-        """ Attempts to modify a trait by spending or refunding freebie points. Returns (Success, Message). """
+        """Attempts to modify a trait by spending or refunding freebie points. Returns (Success, Message)."""
         
         cost_per_dot = FREEBIE_COSTS[category_name]
         remaining_points = self.total_freebies - self.spent_freebies

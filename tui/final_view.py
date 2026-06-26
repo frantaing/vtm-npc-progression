@@ -19,15 +19,8 @@ class FinalView:
             container_height = min(55, h - 6)
 
             # Format freebie string
-            if self.character.is_free_mode:
-                freebie_str = f"Total Freebie Points Spent: {self.character.spent_freebies}"
-                freebie_color = theme.CLR_ACCENT()
-            else:
-                remaining = self.character.total_freebies - self.character.spent_freebies
-                freebie_str = f"Freebie Points: {self.character.spent_freebies}/{self.character.total_freebies} spent"
-                if remaining > 0:
-                    freebie_str += f" ({remaining} remaining)"
-                freebie_color = theme.CLR_ACCENT()
+            freebie_str, freebie_state = self.character.get_freebie_display()
+            freebie_color = theme.CLR_ERROR() if freebie_state == "empty" else theme.CLR_ACCENT()
 
             layout = draw_sheet_container(
                 self.stdscr, self.character,
