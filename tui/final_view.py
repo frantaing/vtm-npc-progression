@@ -3,7 +3,7 @@ import curses
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter
-from .renderer import draw_character_sheet_columns, draw_sheet_container, SheetItem
+from .renderer import draw_character_sheet_columns, draw_sheet_container, SheetItem, build_col3_items
 
 class FinalView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -43,22 +43,7 @@ class FinalView:
                 for a in ABILITIES_LIST
             ]
 
-            col3_items = []
-            col3_items.append(SheetItem("Header", "DISCIPLINES"))
-            for disc in self.character.disciplines:
-                col3_items.append(SheetItem("Discipline", disc, self.character.get_trait_data("Discipline", disc)))
-            col3_items.append(SheetItem("Spacer", ""))
-            col3_items.append(SheetItem("Header", "BACKGROUNDS"))
-            for bg in self.character.backgrounds:
-                col3_items.append(SheetItem("Background", bg, self.character.get_trait_data("Background", bg)))
-            col3_items.append(SheetItem("Spacer", ""))
-            col3_items.append(SheetItem("Header", "VIRTUES"))
-            for virt in VIRTUES_LIST:
-                col3_items.append(SheetItem("Virtue", virt, self.character.get_trait_data("Virtue", virt)))
-            col3_items.append(SheetItem("Spacer", ""))
-            col3_items.append(SheetItem("Header", "PATH/WILLPOWER"))
-            col3_items.append(SheetItem("Humanity", "Humanity/Path", self.character.get_trait_data("Humanity", "Humanity/Path")))
-            col3_items.append(SheetItem("Willpower", "Willpower", self.character.get_trait_data("Willpower", "Willpower")))
+            col3_items = build_col3_items(self.character)
 
             draw_character_sheet_columns(
                 self.stdscr, self.character,

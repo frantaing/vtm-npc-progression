@@ -16,6 +16,40 @@ class SheetItem(NamedTuple):
     name: str
     data: dict = {}
 
+# --- [COL3 BUILDER] ---
+def build_col3_items(character) -> list:
+    """
+    Builds the shared col3 SheetItem list (Disciplines, Backgrounds,
+    Virtues, Path/Willpower) from a character object.
+    Used by both MainView and FinalView.
+    """
+    from vtm_data import VIRTUES_LIST
+
+    items = []
+
+    items.append(SheetItem("Header", "DISCIPLINES"))
+    for disc in character.disciplines:
+        items.append(SheetItem("Discipline", disc, character.get_trait_data("Discipline", disc)))
+    items.append(SheetItem("System", "Add Discipline"))
+
+    items.append(SheetItem("Spacer", ""))
+    items.append(SheetItem("Header", "BACKGROUNDS"))
+    for bg in character.backgrounds:
+        items.append(SheetItem("Background", bg, character.get_trait_data("Background", bg)))
+    items.append(SheetItem("System", "Add Background"))
+
+    items.append(SheetItem("Spacer", ""))
+    items.append(SheetItem("Header", "VIRTUES"))
+    for virt in VIRTUES_LIST:
+        items.append(SheetItem("Virtue", virt, character.get_trait_data("Virtue", virt)))
+
+    items.append(SheetItem("Spacer", ""))
+    items.append(SheetItem("Header", "PATH/WILLPOWER"))
+    items.append(SheetItem("Humanity", "Humanity/Path", character.get_trait_data("Humanity", "Humanity/Path")))
+    items.append(SheetItem("Willpower", "Willpower", character.get_trait_data("Willpower", "Willpower")))
+
+    return items
+
 # --- [SINGLE TRAIT ROW] ---
 def draw_trait_row(stdscr, y: int, x: int, name: str, data: dict, width: int, is_selected: bool = False, is_modified: bool = False, is_interactive: bool = False):
     """
