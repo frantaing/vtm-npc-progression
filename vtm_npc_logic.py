@@ -15,9 +15,7 @@ from vtm_data import (
 
 # --- [CHARACTER CLASS] ---
 class VtMCharacter:
-
     """Stores and manages a VtM character's progression."""
-
     def __init__(self, name: str, clan: str, age: int, generation: int, is_free_mode: bool = False, _skip_clan_init: bool = False):
         self.name = name
         self.clan = clan
@@ -41,9 +39,7 @@ class VtMCharacter:
             self._apply_clan_disciplines()
 
     def _apply_clan_disciplines(self):
-
         """Checks if the chosen clan exists in data and adds its disciplines."""
-
         # Normalize input to Title Case for lookup (e.g. "brujah" -> "Brujah")
         formatted_clan = self.clan.title()
         
@@ -53,22 +49,18 @@ class VtMCharacter:
                 self.disciplines[disc] = {"base": 0, "new": 0}
 
     def _calculate_total_freebies(self) -> int:
-
         """Calculates total freebies based on character's age."""
-
         for upper_age, points in AGE_FREEBIE_BRACKETS:
             if self.age <= upper_age:
                 return points
         return AGE_FREEBIE_BRACKETS[-1][1]
 
     def get_freebie_display(self) -> tuple[str, str]:
-        
         """
         Returns a (display_string, state) tuple for the freebie points block.
         State is one of: "normal", "empty", "free".
         Callers resolve state to a color attribute.
         """
-        
         if self.is_free_mode:
             return f"Freebie Points Spent: {self.spent_freebies}", "free"
         
@@ -78,24 +70,18 @@ class VtMCharacter:
         return display, state
 
     def set_initial_trait(self, category: str, trait_name: str, value: int):
-
         """Sets the initial base and new value for a named trait."""
-
         trait_dict = getattr(self, category)
         trait_dict[trait_name] = {"base": value, "new": value}
 
     def set_initial_value(self, category: str, value: int):
-
         """Sets the initial base and new value for a single-value stat."""
-
         stat = getattr(self, category)
         stat["base"] = value
         stat["new"] = value
 
     def get_trait_data(self, category_name: str, trait_name: str) -> Dict[str, int]:
-        
         """Gets the data dictionary for a specific trait."""
-        
         if category_name in ["Attribute", "Ability", "Discipline", "Background", "Virtue"]:
             attr_name = "abilities" if category_name == "Ability" else f"{category_name.lower()}s"
             trait_pool = getattr(self, attr_name)
@@ -105,9 +91,7 @@ class VtMCharacter:
 
     # Trait modification
     def improve_trait(self, category_name: str, trait_name: str, target_value: int) -> Tuple[bool, str]:
-
         """Attempts to modify a trait by spending or refunding freebie points. Returns (Success, Message)."""
-        
         cost_per_dot = FREEBIE_COSTS[category_name]
         remaining_points = self.total_freebies - self.spent_freebies
 
@@ -157,9 +141,7 @@ class VtMCharacter:
         return True, f"'{trait_name}' {action} to {target_value}. {points_label}: {abs(total_cost)} points"
 
     def remove_trait(self, category_name: str, trait_name: str) -> Tuple[bool, str]:
-
         """Removes a trait and refunds the points spent on it."""
-        
         # Only allow removing Disciplines and Backgrounds for now
         if category_name == "Discipline":
             target_dict = self.disciplines
@@ -184,9 +166,7 @@ class VtMCharacter:
         return True, f"Removed {trait_name}. Refunded {refund} points."
 
     def get_text_sheet(self) -> str:
-
         """Generates a plain text representation of the character sheet."""
-        
         lines = []
         lines.append("="*40)
         lines.append(f"NAME: {self.name} ({self.clan})")
