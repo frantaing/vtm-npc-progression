@@ -36,7 +36,6 @@ class FinalView:
                 container_width, container_height
             )
 
-            layout["start_y"] = layout["content_y"]
             layout["max_rows"] = container_height - 8
 
             # Build item lists
@@ -67,9 +66,6 @@ class FinalView:
             col3_items.append(SheetItem("Header", "PATH/WILLPOWER"))
             col3_items.append(SheetItem("Humanity", "Humanity/Path", self.character.get_trait_data("Humanity", "Humanity/Path")))
             col3_items.append(SheetItem("Willpower", "Willpower", self.character.get_trait_data("Willpower", "Willpower")))
-
-            # Remap content_y -> start_y for draw_character_sheet_columns
-            layout["start_y"] = layout["content_y"]
 
             draw_character_sheet_columns(
                 self.stdscr, self.character,

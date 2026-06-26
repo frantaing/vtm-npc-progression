@@ -221,10 +221,9 @@ class MainView:
             freebie_str, freebie_color,
             container_width, container_height
         )
-        layout["start_y"] = layout["content_y"]
         layout["max_rows"] = container_height - 7
 
-        list_start_y = layout["content_y"]
+        list_start_y = layout["start_y"]
         col3_x = layout["cx3"]
         max_rows = layout["max_rows"]
 
@@ -304,8 +303,6 @@ class MainView:
             container_width, container_height
         )
 
-        # Remap content_y -> start_y for draw_character_sheet_columns
-        layout["start_y"] = layout["content_y"]
         layout["max_rows"] = container_height - 7
 
         draw_character_sheet_columns(
