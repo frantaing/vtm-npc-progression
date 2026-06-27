@@ -5,7 +5,7 @@ from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter, ATTRIBUTES_LIST, ABILITIES_LIST, VIRTUES_LIST, FREEBIE_COSTS, DISCIPLINES_LIST, BACKGROUNDS_LIST
 from .utils import QuitApplication
-from .renderer import draw_character_sheet_columns, draw_sheet_container, SheetItem
+from .renderer import draw_character_sheet_columns, draw_sheet_container, SheetItem, build_col3_items
 
 class MainView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -116,33 +116,7 @@ class MainView:
         return items
 
     def _get_col3_items(self) -> list:
-        items = []
-
-        items.append(SheetItem("Header", "DISCIPLINES"))
-        for disc in self.character.disciplines:
-            data = self.character.get_trait_data("Discipline", disc)
-            items.append(SheetItem("Discipline", disc, data))
-        items.append(SheetItem("System", "Add Discipline"))
-
-        items.append(SheetItem("Spacer", ""))
-        items.append(SheetItem("Header", "BACKGROUNDS"))
-        for bg in self.character.backgrounds:
-            data = self.character.get_trait_data("Background", bg)
-            items.append(SheetItem("Background", bg, data))
-        items.append(SheetItem("System", "Add Background"))
-
-        items.append(SheetItem("Spacer", ""))
-        items.append(SheetItem("Header", "VIRTUES"))
-        for virt in VIRTUES_LIST:
-            data = self.character.get_trait_data("Virtue", virt)
-            items.append(SheetItem("Virtue", virt, data))
-
-        items.append(SheetItem("Spacer", ""))
-        items.append(SheetItem("Header", "PATH/WILLPOWER"))
-        items.append(SheetItem("Humanity", "Humanity/Path", self.character.get_trait_data("Humanity", "Humanity/Path")))
-        items.append(SheetItem("Willpower", "Willpower", self.character.get_trait_data("Willpower", "Willpower")))
-
-        return items
+        return build_col3_items(self.character)
 
     # --- [LOGIC HANDLERS] ---
     def _handle_modification(self, c1, c2, c3, delta):
@@ -206,13 +180,8 @@ class MainView:
         container_height = min(50, h - 2)
 
         # Build freebie string (needed to call draw_sheet_container to get accurate layout)
-        if self.character.is_free_mode:
-            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
-            freebie_color = theme.CLR_ACCENT()
-        else:
-            remaining = self.character.total_freebies - self.character.spent_freebies
-            freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
-            freebie_color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
+        freebie_str, freebie_state = self.character.get_freebie_display()
+        freebie_color = theme.CLR_ERROR() if freebie_state == "empty" else theme.CLR_ACCENT()
 
         # Get the same layout dict _draw_screen uses so coordinates match exactly
         layout = draw_sheet_container(
@@ -288,13 +257,8 @@ class MainView:
         container_height = min(50, h - 2)
 
         # Format freebie string
-        if self.character.is_free_mode:
-            freebie_str = f"Freebie Points Spent: {self.character.spent_freebies}"
-            freebie_color = theme.CLR_ACCENT()
-        else:
-            remaining = self.character.total_freebies - self.character.spent_freebies
-            freebie_str = f"Freebie: {remaining}/{self.character.total_freebies}"
-            freebie_color = theme.CLR_ACCENT() if remaining > 0 else theme.CLR_ERROR()
+        freebie_str, freebie_state = self.character.get_freebie_display()
+        freebie_color = theme.CLR_ERROR() if freebie_state == "empty" else theme.CLR_ACCENT()
 
         layout = draw_sheet_container(
             self.stdscr, self.character,

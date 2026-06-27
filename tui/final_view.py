@@ -3,7 +3,7 @@ import curses
 from . import utils
 from . import theme
 from vtm_npc_logic import VtMCharacter
-from .renderer import draw_character_sheet_columns, draw_sheet_container, SheetItem
+from .renderer import draw_character_sheet_columns, draw_sheet_container, SheetItem, build_col3_items
 
 class FinalView:
     def __init__(self, stdscr, character: VtMCharacter):
@@ -19,15 +19,8 @@ class FinalView:
             container_height = min(55, h - 6)
 
             # Format freebie string
-            if self.character.is_free_mode:
-                freebie_str = f"Total Freebie Points Spent: {self.character.spent_freebies}"
-                freebie_color = theme.CLR_ACCENT()
-            else:
-                remaining = self.character.total_freebies - self.character.spent_freebies
-                freebie_str = f"Freebie Points: {self.character.spent_freebies}/{self.character.total_freebies} spent"
-                if remaining > 0:
-                    freebie_str += f" ({remaining} remaining)"
-                freebie_color = theme.CLR_ACCENT()
+            freebie_str, freebie_state = self.character.get_freebie_display()
+            freebie_color = theme.CLR_ERROR() if freebie_state == "empty" else theme.CLR_ACCENT()
 
             layout = draw_sheet_container(
                 self.stdscr, self.character,
@@ -50,22 +43,7 @@ class FinalView:
                 for a in ABILITIES_LIST
             ]
 
-            col3_items = []
-            col3_items.append(SheetItem("Header", "DISCIPLINES"))
-            for disc in self.character.disciplines:
-                col3_items.append(SheetItem("Discipline", disc, self.character.get_trait_data("Discipline", disc)))
-            col3_items.append(SheetItem("Spacer", ""))
-            col3_items.append(SheetItem("Header", "BACKGROUNDS"))
-            for bg in self.character.backgrounds:
-                col3_items.append(SheetItem("Background", bg, self.character.get_trait_data("Background", bg)))
-            col3_items.append(SheetItem("Spacer", ""))
-            col3_items.append(SheetItem("Header", "VIRTUES"))
-            for virt in VIRTUES_LIST:
-                col3_items.append(SheetItem("Virtue", virt, self.character.get_trait_data("Virtue", virt)))
-            col3_items.append(SheetItem("Spacer", ""))
-            col3_items.append(SheetItem("Header", "PATH/WILLPOWER"))
-            col3_items.append(SheetItem("Humanity", "Humanity/Path", self.character.get_trait_data("Humanity", "Humanity/Path")))
-            col3_items.append(SheetItem("Willpower", "Willpower", self.character.get_trait_data("Willpower", "Willpower")))
+            col3_items = build_col3_items(self.character)
 
             draw_character_sheet_columns(
                 self.stdscr, self.character,
