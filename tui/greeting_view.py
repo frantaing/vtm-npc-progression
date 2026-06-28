@@ -6,7 +6,7 @@ from .save_manager import list_saves, load_character, default_save_name
 from vtm_npc_logic import VtMCharacter
 
 # --- [VERSION] ---
-VERSION = "v2.4.2"
+VERSION = "v2.4.3"
 
 # --- [RESULT TYPE] ---
 class GreetingResult(NamedTuple):
